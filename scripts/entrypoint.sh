@@ -39,28 +39,27 @@ if ! command -v claude >/dev/null 2>&1; then
 fi
 
 # Hooks that tell the update watcher when a turn is in flight and which
-# conversation the web session is on. Merged into the user settings once;
-# gated on CLAUDE_WEB_INTERACTIVE so Remote Control sessions started from the
-# app don't touch the state files.
+# conversation the web session is on (see scripts/session-hook.sh). Rewritten
+# on every start so an update to the hook reaches existing installs: entries
+# pointing at claude-session-hook, and the inline ones earlier versions wrote
+# (they mention autoupdate-state), are replaced; any other hook is kept.
 settings="$HOME/.claude/settings.json"
 mkdir -p "$HOME/.claude"
 [ -s "$settings" ] || echo '{}' > "$settings"
-if ! grep -q 'autoupdate-state' "$settings"; then
-  hook() {
-    printf '[ -n "$CLAUDE_WEB_INTERACTIVE" ] || exit 0; d="$HOME/.claude/autoupdate-state"; mkdir -p "$d"; date +%%s > "$d/%s"; jq -r ".session_id // empty" > "$d/session-id.tmp" && [ -s "$d/session-id.tmp" ] && mv "$d/session-id.tmp" "$d/session-id"; exit 0' "$1"
-  }
-  tmp=$(mktemp)
-  if jq --arg p "$(hook last-prompt)" --arg s "$(hook last-stop)" '
-      .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{hooks: [{type: "command", command: $p, timeout: 10}]}])
-    | .hooks.Stop             = ((.hooks.Stop             // []) + [{hooks: [{type: "command", command: $s, timeout: 10}]}])
+tmp=$(mktemp)
+if jq --arg cmd /usr/local/bin/claude-session-hook '
+    def ours: (.command // "") | (startswith($cmd) or contains("autoupdate-state"));
+    def strip: map(.hooks = ((.hooks // []) | map(select(ours | not)))) | map(select(.hooks | length > 0));
+    def entry($ev): [{hooks: [{type: "command", command: ($cmd + " " + $ev), timeout: 10}]}];
+    .hooks = ((.hooks // {}) | with_entries(.value |= strip) | with_entries(select(.value | length > 0)))
+    | .hooks.UserPromptSubmit += entry("last-prompt")
+    | .hooks.Stop += entry("last-stop")
     ' "$settings" > "$tmp"; then
-    cat "$tmp" > "$settings"
-    echo "[claude-web] installed auto-update hooks into $settings"
-  else
-    echo "[claude-web] could not parse $settings; auto-update hooks not installed" >&2
-  fi
-  rm -f "$tmp"
+  cmp -s "$tmp" "$settings" || { cat "$tmp" > "$settings"; echo "[claude-web] updated the auto-update hooks in $settings"; }
+else
+  echo "[claude-web] could not parse $settings; auto-update hooks not installed" >&2
 fi
+rm -f "$tmp"
 
 # Start the interactive session now so it runs before anyone opens the web
 # terminal. ttyd's "new-session -A" recreates it if it ever goes away.
@@ -92,9 +91,13 @@ fi
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
   (
     while true; do
-      claude remote-control || true
-      echo "[claude-web] remote-control exited -- restarting in 30s (log in via the web terminal if this repeats)"
-      sleep 30
+      claude remote-control
+      if [ $? -eq 143 ]; then
+        sleep 5   # the update watcher moved it onto a new release
+      else
+        echo "[claude-web] remote-control exited -- restarting in 30s (log in via the web terminal if this repeats)"
+        sleep 30
+      fi
     done
   ) &
   loops+=($!)
