@@ -22,12 +22,21 @@ if [ ! -w "$HOME" ]; then
   echo "[claude-web] $HOME is not writable by uid $(id -u); fix ownership of the config volume" >&2
 fi
 
-until command -v claude >/dev/null 2>&1; do
-  echo "[claude-web] claude binary not found -- installing to $HOME/.local/bin"
-  curl -fsSL https://claude.ai/install.sh | bash && break
-  echo "[claude-web] install failed, retrying in 60s"
-  sleep 60
-done
+# Install Claude Code in the background so the web terminal comes up even when
+# the install cannot run yet (no network on first start, say). The session
+# loop waits for the binary, and the terminal gives a shell meanwhile.
+loops=()   # background loops that on_stop ends
+if ! command -v claude >/dev/null 2>&1; then
+  (
+    until command -v claude >/dev/null 2>&1; do
+      echo "[claude-web] claude binary not found -- installing to $HOME/.local/bin"
+      curl -fsSL https://claude.ai/install.sh | bash && break
+      echo "[claude-web] install failed, retrying in 60s"
+      sleep 60
+    done
+  ) &
+  loops+=($!)
+fi
 
 # Hooks that tell the update watcher when a turn is in flight and which
 # conversation the web session is on. Merged into the user settings once;
@@ -73,17 +82,50 @@ fi
     sleep 5
   done
 ) &
+loops+=($!)
 
 if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
   /usr/local/bin/claude-update-watcher &
+  loops+=($!)
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
-  while true; do
-    claude remote-control || true
-    echo "[claude-web] remote-control exited -- restarting in 30s (log in via the web terminal if this repeats)"
-    sleep 30
-  done
-else
-  wait
+  (
+    while true; do
+      claude remote-control || true
+      echo "[claude-web] remote-control exited -- restarting in 30s (log in via the web terminal if this repeats)"
+      sleep 30
+    done
+  ) &
+  loops+=($!)
 fi
+
+# Stop cleanly. `docker stop` signals only this script (through tini). Without
+# this, every Claude process would be SIGKILLed when the stop timeout ran out:
+# mid tool call, with its Remote Control session left dangling. Stop the loops
+# first so nothing restarts, give every Claude process a SIGTERM and up to
+# STOP_GRACE_SECS to exit, then take tmux down. docker-compose.yml allows 30s.
+STOP_GRACE_SECS="${CLAUDE_STOP_GRACE_SECS:-20}"
+# Interactive sessions run as "claude ..."; sessions the Remote Control server
+# spawns run as the versioned binary's full path.
+CLAUDE_PROC_RE="^(claude|$HOME/\.local/share/claude/versions/[^ ]+)( |\$)"
+on_stop() {
+  trap '' TERM INT
+  echo "[claude-web] stopping: asking Claude to exit (up to ${STOP_GRACE_SECS}s)"
+  kill "${loops[@]}" 2>/dev/null
+  pkill -x ttyd 2>/dev/null
+  local pids i
+  pids=$(pgrep -f "$CLAUDE_PROC_RE")
+  [ -n "$pids" ] && kill -TERM $pids 2>/dev/null
+  for ((i = 0; i < STOP_GRACE_SECS * 2; i++)); do
+    pgrep -f "$CLAUDE_PROC_RE" >/dev/null || break
+    sleep 0.5
+  done
+  pgrep -f "$CLAUDE_PROC_RE" >/dev/null && echo "[claude-web] Claude did not exit within ${STOP_GRACE_SECS}s; stopping anyway"
+  tmux kill-server 2>/dev/null
+  exit 143
+}
+trap on_stop TERM INT
+
+# wait returns early when a trapped signal arrives, so the trap runs at once.
+while true; do wait; sleep 1; done

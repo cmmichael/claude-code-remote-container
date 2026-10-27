@@ -61,6 +61,7 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_AUTO_UPDATE_RESTART` | `true` | Run the update watcher |
 | `CLAUDE_UPDATE_IDLE_SECS` | 900 | Idle time before an update restart |
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
+| `CLAUDE_STOP_GRACE_SECS` | 20 | How long Claude gets to exit when the container stops. Keep it under `stop_grace_period` (30s) |
 
 Build arguments `INSTALL_DOCKER_CLI` and `INSTALL_GH` (both `true`) control the optional Docker and GitHub CLIs. To let Claude manage containers, point `DOCKER_HOST` at a restricted socket proxy such as `tecnativa/docker-socket-proxy`. Don't mount the raw Docker socket: that is root on the host.
 
@@ -70,6 +71,9 @@ Build arguments `INSTALL_DOCKER_CLI` and `INSTALL_GH` (both `true`) control the 
 - `scripts/session.sh` runs inside tmux. It loops `claude --resume <id> --remote-control <name>`, falling back to `--continue`, then a fresh session.
 - The hooks (UserPromptSubmit and Stop) record when a turn starts and ends and the current session id in `$HOME/.claude/autoupdate-state/`. They only act in the web-terminal session.
 - `scripts/update-watcher.sh` checks every minute whether the running binary is older than the installed one. When no turn is in flight and the terminal has been quiet for the idle time, it sends SIGTERM, and the session loop resumes on the new version.
+- On `docker stop`, the entrypoint stops its restart loops, sends every Claude process SIGTERM and waits up to `CLAUDE_STOP_GRACE_SECS` before taking tmux down. Claude finishes cleanly and its Remote Control sessions close instead of being killed.
+- Claude Code installs in the background on first start, so the web terminal is up at once. The session waits for the binary, and Ctrl-C there gives a shell.
+- The image's health check reports healthy while the web terminal answers.
 
 ## What's private
 

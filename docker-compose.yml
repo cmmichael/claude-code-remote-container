@@ -7,6 +7,7 @@ services:
     container_name: claude
     hostname: claude          # Remote Control sessions show up as "<hostname>-web"
     init: true                # reaps orphaned tool processes
+    stop_grace_period: 30s    # Claude gets up to CLAUDE_STOP_GRACE_SECS (20) to exit on stop
     user: "${PUID:-1000}:${PGID:-1000}"
     environment:
       - TZ=${TZ:-UTC}

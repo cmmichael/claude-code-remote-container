@@ -16,6 +16,13 @@ STATE="$HOME/.claude/autoupdate-state"
 RC_NAME="${CLAUDE_RC_NAME:-$(hostname)-web}"
 cd /workspace
 
+until command -v claude >/dev/null 2>&1; do
+  echo "[claude-web] waiting for Claude Code to finish installing (see the container log); Ctrl-C for a shell"
+  if ! sleep 10; then
+    bash -l
+  fi
+done
+
 while true; do
   sid=$(cat "$STATE/session-id" 2>/dev/null || true)
   if [ -n "$sid" ]; then
