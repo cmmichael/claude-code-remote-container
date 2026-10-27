@@ -1,9 +1,46 @@
+# Web client for ttyd. The client embedded in the ttyd 1.7.7 binary (the latest
+# release) bundles xterm.js 5.4 without the clipboard addon, so every OSC 52
+# write is silently dropped: tmux mouse/copy-mode copies and Claude Code's
+# "press c to copy" never reach the browser clipboard. Build the current client
+# (xterm.js 5.5 + @xterm/addon-clipboard) from a pinned ttyd commit and serve it
+# with --index. yarn honours the upstream lockfile, so the output is
+# reproducible; the page is plain HTML/JS, so this stage runs on the build
+# platform even for the arm64 image. Ported from the Home Assistant add-on
+# con-ant/hass-addons (claudecode/Dockerfile). Drop the stage and --index once a
+# ttyd release newer than 1.7.7 ships, but keep the shim or re-check it.
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS ttyd-client
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+ARG TTYD_CLIENT_COMMIT=2922cb89f518bae4d0fcf4d757a7419638fc71fc
+RUN curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+      "https://github.com/tsl0922/ttyd/archive/${TTYD_CLIENT_COMMIT}.tar.gz" \
+    | tar xz && mv "ttyd-${TTYD_CLIENT_COMMIT}" /ttyd
+WORKDIR /ttyd/html
+# COREPACK_INTEGRITY_KEYS=0 keeps the pinned corepack working across npm
+# signing-key rotations; dependency integrity comes from yarn.lock checksums.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    COREPACK_NPM_REGISTRY=https://registry.npmjs.org \
+    COREPACK_INTEGRITY_KEYS=0
+RUN npm install -g corepack@0.35.0 && corepack enable \
+ && yarn install --immutable && yarn run inline
+# The bundle captures the WebAssembly global at load time. Chrome removes that
+# global when the JIT is blocked by policy, which leaves a blank page; the shim
+# keeps the terminal working (only sixel images, never enabled here, use wasm).
+COPY ttyd-client/ /ttyd-client/
+RUN node /ttyd-client/inject-wasm-shim.js /ttyd/html/dist/inline.html /ttyd-client/wasm-shim.html
+
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget git jq less nano openssh-client procps ripgrep \
-    unzip zip gnupg tmux htop lsof file rsync sqlite3 libnss-wrapper \
+    unzip zip gnupg htop lsof file rsync sqlite3 libnss-wrapper \
     python3 python3-pip python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+
+# tmux from bookworm-backports (3.5a). Bookworm's own 3.3a cannot forward OSC 8
+# hyperlinks, which is what makes the wrapped /login URL clickable as one link.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list \
+ && apt-get update && apt-get install -y --no-install-recommends -t bookworm-backports tmux \
  && rm -rf /var/lib/apt/lists/*
 
 # Node.js (NodeSource) -- handy for MCP servers and JS projects
@@ -17,6 +54,7 @@ ARG TTYD_VERSION=1.7.7
 RUN curl -fsSL -o /usr/local/bin/ttyd \
       "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.$(uname -m)" \
  && chmod +x /usr/local/bin/ttyd
+COPY --from=ttyd-client /ttyd/html/dist/inline.html /usr/share/ttyd/index.html
 
 # Optional extras: Docker CLI (+compose plugin) and GitHub CLI.
 # Build with --build-arg INSTALL_DOCKER_CLI=false / INSTALL_GH=false to skip.

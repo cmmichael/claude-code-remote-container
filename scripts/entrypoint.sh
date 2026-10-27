@@ -57,7 +57,12 @@ fi
 # terminal. ttyd's "new-session -A" recreates it if it ever goes away.
 tmux new-session -d -s claude -x 200 -y 50 /usr/local/bin/claude-session 2>/dev/null || true
 
-ttyd_args=(--writable --port 7681 --interface 0.0.0.0 -t "titleFixed=${CLAUDE_WEB_TITLE:-claude}" -t fontSize=14)
+# --index serves the newer web client built in the Dockerfile (OSC 52 clipboard).
+# macOptionClickForcesSelection lets Option+drag select text on macOS while tmux
+# and Claude Code hold the mouse; Windows/Linux use Shift+drag.
+ttyd_args=(--writable --port 7681 --interface 0.0.0.0 -t "titleFixed=${CLAUDE_WEB_TITLE:-claude}" -t fontSize=14
+  -t macOptionClickForcesSelection=true)
+[ -f /usr/share/ttyd/index.html ] && ttyd_args+=(--index /usr/share/ttyd/index.html)
 if [ -n "${TTYD_CREDENTIAL:-}" ]; then
   ttyd_args+=(--credential "$TTYD_CREDENTIAL")
 fi
