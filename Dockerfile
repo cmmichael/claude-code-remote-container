@@ -90,7 +90,8 @@ COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY scripts/session.sh /usr/local/bin/claude-session
 COPY scripts/update-watcher.sh /usr/local/bin/claude-update-watcher
 COPY scripts/with-passwd.sh /usr/local/bin/with-passwd
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/local/bin/claude-update-watcher /usr/local/bin/with-passwd \
+COPY scripts/session-hook.sh /usr/local/bin/claude-session-hook
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/local/bin/claude-update-watcher /usr/local/bin/with-passwd /usr/local/bin/claude-session-hook \
  && for t in ssh scp sftp ssh-keygen ssh-add; do ln -s with-passwd "/usr/local/bin/$t"; done
 
 # ttyd web terminal. Put an authenticating reverse proxy in front of it, or set
