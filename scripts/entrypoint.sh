@@ -16,6 +16,7 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
+rm -f "$STATE/stopping"   # left by on_stop at the last container stop
 cd /workspace
 
 if [ ! -w "$HOME" ]; then
@@ -115,6 +116,7 @@ CLAUDE_PROC_RE="^(claude|$HOME/\.local/share/claude/versions/[^ ]+)( |\$)"
 on_stop() {
   trap '' TERM INT
   echo "[claude-web] stopping: asking Claude to exit (up to ${STOP_GRACE_SECS}s)"
+  touch "$STATE/stopping"   # session.sh must not start Claude again
   kill "${loops[@]}" 2>/dev/null
   pkill -x ttyd 2>/dev/null
   local pids i

@@ -5,7 +5,7 @@
 # one until restarted. This loop watches for that gap and, once the interactive
 # session has been idle for a while, stops it; session.sh immediately starts the
 # new version on the same conversation. The Remote Control server is restarted
-# the same way when it has no live sessions under it.
+# once every session under it is idle (see below); its sessions reattach.
 #
 # Idle = no turn in flight (the UserPromptSubmit/Stop hooks stamp last-prompt and
 # last-stop) AND nothing typed or printed in the tmux session for IDLE_SECS.

@@ -23,19 +23,34 @@ until command -v claude >/dev/null 2>&1; do
   fi
 done
 
+# Run one claude; succeed unless it failed by itself right away (a resume of a
+# conversation that no longer exists, say). A claude stopped by a signal (the
+# update watcher's SIGTERM, a container stop) or one that ran for a while
+# counts as done, so the loop comes back to the same conversation by id rather
+# than falling through to --continue, which opens whichever conversation in
+# /workspace is newest.
+try() {
+  local t0 rc
+  t0=$(date +%s)
+  claude "$@" --remote-control "$RC_NAME"
+  rc=$?
+  [ "$rc" -eq 0 ] || [ "$rc" -gt 128 ] || [ $(( $(date +%s) - t0 )) -ge 30 ]
+}
+
 while true; do
   sid=$(cat "$STATE/session-id" 2>/dev/null || true)
   if [ -n "$sid" ]; then
-    claude --resume "$sid" --remote-control "$RC_NAME" \
-      || claude --continue --remote-control "$RC_NAME" \
-      || claude --remote-control "$RC_NAME"
+    try --resume "$sid" || try --continue || try
   else
-    claude --continue --remote-control "$RC_NAME" || claude --remote-control "$RC_NAME"
+    try --continue || try
   fi
 
+  # entrypoint.sh's on_stop marks a container stop; don't start Claude again.
+  [ -e "$STATE/stopping" ] && exit 0
   echo
   echo "[claude-web] claude exited. Restarting in 5s -- Ctrl-C for a shell (type 'exit' to come back)."
   if ! sleep 5; then
     bash -l
   fi
+  [ -e "$STATE/stopping" ] && exit 0
 done
