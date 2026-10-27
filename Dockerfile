@@ -2,7 +2,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget git jq less nano openssh-client procps ripgrep \
-    unzip zip gnupg tmux htop lsof file rsync sqlite3 \
+    unzip zip gnupg tmux htop lsof file rsync sqlite3 libnss-wrapper \
     python3 python3-pip python3-venv \
  && rm -rf /var/lib/apt/lists/*
 
@@ -51,7 +51,9 @@ COPY tmux.conf /etc/tmux.conf
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY scripts/session.sh /usr/local/bin/claude-session
 COPY scripts/update-watcher.sh /usr/local/bin/claude-update-watcher
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/local/bin/claude-update-watcher
+COPY scripts/with-passwd.sh /usr/local/bin/with-passwd
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/local/bin/claude-update-watcher /usr/local/bin/with-passwd \
+ && for t in ssh scp sftp ssh-keygen ssh-add; do ln -s with-passwd "/usr/local/bin/$t"; done
 
 # ttyd web terminal. Put an authenticating reverse proxy in front of it, or set
 # TTYD_CREDENTIAL; never publish it to an untrusted network bare.

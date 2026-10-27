@@ -62,3 +62,7 @@ Everything personal lives in `./config` (the container's `$HOME`): Claude creden
 ## Prebuilt image
 
 Every push to `main` builds `ghcr.io/<owner>/claude-code-web` for amd64 and arm64 (see `.github/workflows/image.yml`). The package is private while the repo is. To use it, run `docker login ghcr.io` with a token that has `read:packages`, then swap `build: .` for that `image:` line in `docker-compose.yml`.
+
+## SSH as an arbitrary user
+
+The container runs as whatever `PUID` you choose, which has no entry in `/etc/passwd`. OpenSSH refuses to run without one. `ssh`, `scp`, `sftp`, `ssh-keygen` and `ssh-add` therefore go through `scripts/with-passwd.sh`, which uses nss_wrapper to supply an entry for that process only. Keys and `~/.ssh/config` live in `./config/.ssh` and persist.
