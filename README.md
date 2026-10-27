@@ -33,6 +33,22 @@ The web terminal is a shell with your Claude login. The compose file binds it to
 
 The proxy must allow websockets.
 
+## Copy and paste
+
+tmux and Claude Code both hold the mouse, so a plain drag is tmux's selection, not the browser's. All of these land on your clipboard:
+
+| To | Do |
+| --- | --- |
+| Copy what you drag | Drag with the mouse. tmux copies the selection when you let go. |
+| Copy from Claude Code | Use its own copy keys, such as `c` on the `/login` screen. |
+| Copy with the browser's own selection | Hold `Option` (macOS) or `Shift` (Windows, Linux) while dragging. Look for the brief ✂ icon. |
+| Open the login URL | Click any row of it. It is a real link, so the whole URL opens even though it wraps. |
+| Paste | `Cmd+V` or `Ctrl+Shift+V`, or `Shift+Insert`. |
+
+The first two travel as OSC 52 escape sequences, and browsers accept those only on HTTPS or `localhost`. Behind a plain-HTTP proxy, use the modifier drag instead.
+
+ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirely. The image therefore builds the newer ttyd client (xterm.js 5.5 with its clipboard addon) from a pinned commit and serves it with `--index`. `tmux.conf` labels every copy the way that client accepts and forwards hyperlinks, which needs the tmux 3.5 from bookworm-backports.
+
 ## Configuration
 
 | Variable | Default | Meaning |
