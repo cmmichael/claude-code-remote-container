@@ -1,6 +1,8 @@
 services:
   claude:
     build: .
+    # Or skip the local build and pull the prebuilt image (private: `docker login ghcr.io` first):
+    # image: ghcr.io/<owner>/claude-code-web:latest
     image: claude-code-web:local
     container_name: claude
     hostname: claude          # Remote Control sessions show up as "<hostname>-web"

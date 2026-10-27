@@ -58,3 +58,7 @@ Build arguments `INSTALL_DOCKER_CLI` and `INSTALL_GH` (both `true`) control the 
 ## What's private
 
 Everything personal lives in `./config` (the container's `$HOME`): Claude credentials, transcripts and settings. It is gitignored. Never commit or share it.
+
+## Prebuilt image
+
+Every push to `main` builds `ghcr.io/<owner>/claude-code-web` for amd64 and arm64 (see `.github/workflows/image.yml`). The package is private while the repo is. To use it, run `docker login ghcr.io` with a token that has `read:packages`, then swap `build: .` for that `image:` line in `docker-compose.yml`.
