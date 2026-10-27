@@ -1,0 +1,9 @@
+# Minimal Caddy front end with basic auth. Generate the hash with:
+#   caddy hash-password
+# Caddy proxies websockets automatically.
+claude.example.com {
+	basic_auth {
+		you $2a$14$REPLACE_WITH_HASH
+	}
+	reverse_proxy claude:7681
+}

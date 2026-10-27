@@ -1,0 +1,34 @@
+services:
+  claude:
+    build: .
+    image: claude-code-web:local
+    container_name: claude
+    hostname: claude          # Remote Control sessions show up as "<hostname>-web"
+    init: true                # reaps orphaned tool processes
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - TZ=${TZ:-UTC}
+      # Name shown in claude.ai/code and the Claude app for the web-terminal session
+      - CLAUDE_RC_NAME=${CLAUDE_RC_NAME:-claude-web}
+      # Optional ttyd basic auth (user:password). Use it when no auth proxy is in front.
+      - TTYD_CREDENTIAL=${TTYD_CREDENTIAL:-}
+      # Restart idle sessions onto newly downloaded Claude Code versions
+      - CLAUDE_AUTO_UPDATE_RESTART=true
+      - CLAUDE_UPDATE_IDLE_SECS=900
+      # Separate Remote Control server for starting new sessions from the app
+      - CLAUDE_REMOTE_CONTROL_SERVER=true
+      # Optional: let Claude drive Docker through a restricted socket proxy, e.g.
+      # - DOCKER_HOST=tcp://docker-proxy:2375
+    volumes:
+      - ./config:/config           # HOME: claude binary, login, transcripts. Keep private.
+      - ${WORKSPACE_DIR:-./workspace}:/workspace
+    ports:
+      # Loopback only by default. Expose through an authenticating reverse proxy
+      # (see examples/) instead of widening this.
+      - "127.0.0.1:${TTYD_PORT:-7681}:7681"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
