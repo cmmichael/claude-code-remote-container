@@ -18,6 +18,8 @@ services:
       # Restart idle sessions onto newly downloaded Claude Code versions
       - CLAUDE_AUTO_UPDATE_RESTART=true
       - CLAUDE_UPDATE_IDLE_SECS=900
+      # Claude Code release channel: stable (about a week behind latest) or latest
+      - CLAUDE_UPDATE_CHANNEL=${CLAUDE_UPDATE_CHANNEL:-stable}
       # Separate Remote Control server for starting new sessions from the app
       - CLAUDE_REMOTE_CONTROL_SERVER=true
       # Optional: let Claude drive Docker through a restricted socket proxy, e.g.
