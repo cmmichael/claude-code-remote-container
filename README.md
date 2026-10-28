@@ -58,7 +58,7 @@ The Remote Control server retries every 30 seconds and picks up the login by its
 
 `docker compose up -d` builds the image locally. To use the published image instead, see [Images and updates](#images-and-updates).
 
-**Guides:** [Synology](docs/synology.md) · [Behind Pomerium](docs/pomerium.md) · [Behind Tailscale](docs/tailscale.md) · [Use cases and recipes](docs/use-cases.md)
+**Guides:** [Synology](docs/synology.md) · [Behind Pomerium](docs/pomerium.md) · [Behind Tailscale](docs/tailscale.md) · [Use cases and recipes](docs/use-cases.md) · [Monitoring, Watchtower, Traefik](docs/monitoring.md)
 
 ## Reaching it from elsewhere
 
@@ -150,7 +150,7 @@ Sessions started from claude.ai/code or the Claude app run headless under the Re
 - `scripts/update-watcher.sh` checks every minute whether the running binary is older than the installed one. When no turn is in flight and the terminal has been quiet for the idle time, it sends SIGTERM, and the session loop resumes on the new version. A turn interrupted with Esc never records its end, so after an hour of quiet it stops counting. A permission question left unanswered that long looks the same: the restart drops it, and you ask again in the resumed conversation. Before restarting anything onto a release, it checks that the release answers `claude --version`. A release that fails is not moved onto, and it is checked again every 10 minutes, so a failure that passes, such as a timeout under load, does not strand the session.
 - On `docker stop`, the entrypoint stops its restart loops, sends every Claude process SIGTERM and waits up to `CLAUDE_STOP_GRACE_SECS` before taking tmux down. Claude finishes cleanly and its Remote Control sessions close instead of being killed.
 - Claude Code installs in the background on first start, so the web terminal is up at once. The session waits for the binary, and Ctrl-C there gives a shell.
-- The image's health check calls `/healthz`, which answers without a user check, so it works with `CLAUDE_WEB_AUTH` on and adds nothing to the log.
+- The image's health check calls `/healthz`, which answers 503 when the terminal is down, skips the user check and logs nothing. `/healthz?full=1` adds JSON detail for monitors: see [docs/monitoring.md](docs/monitoring.md).
 
 ## Compared with other projects
 

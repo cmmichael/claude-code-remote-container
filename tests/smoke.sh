@@ -38,15 +38,25 @@ mkdir -p "$WORK/config/.local/share/claude/versions" "$WORK/config/.local/bin" "
 stub="$WORK/config/.local/share/claude/versions/0.0.0-stub"
 cat > "$stub" <<'EOF'
 #!/bin/bash
+# The server runs as a script file named remote-control from its own folder,
+# so its command line is exactly "claude remote-control ...", as for real.
+if [ "${1:-}" = remote-control ]; then
+  shift; cd /config/.local/share/claude/stub && exec -a claude /bin/bash remote-control "$@"
+fi
 if [ -z "${STUB_REEXEC:-}" ]; then STUB_REEXEC=1 exec -a claude /bin/bash "$0" "$@"; fi
 case "${1:-}" in
   --version) echo "0.0.0-stub (Claude Code)"; exit 0 ;;
-  remote-control) echo "stub remote-control server"; trap 'echo "stub server stopping"; exit 0' TERM ;;
   *) trap 'exit 143' TERM ;;
 esac
 while :; do sleep 1; done
 EOF
 chmod +x "$stub"
+mkdir -p "$WORK/config/.local/share/claude/stub"
+cat > "$WORK/config/.local/share/claude/stub/remote-control" <<'EOF'
+echo "stub remote-control server $*"
+trap 'echo "stub server stopping"; exit 0' TERM
+while :; do sleep 1; done
+EOF
 ln -s /config/.local/share/claude/versions/0.0.0-stub "$WORK/config/.local/bin/claude"
 
 # --- start -----------------------------------------------------------------
@@ -78,7 +88,10 @@ jq -e 'has("server") and (.server | has("running"))' >/dev/null <<<"$json" || fa
 ok "/api/sessions answers JSON"
 
 curl -fsS -o /dev/null "http://127.0.0.1:$PORT/token" || fail "GET /token (ttyd, through the proxy) failed"
-ok "ttyd reachable through the proxy"
+health=$(curl -fsS "http://127.0.0.1:$PORT/healthz?full=1") || fail "GET /healthz failed"
+jq -e '.ok and .terminal and .claude_code == "0.0.0-stub" and .remote_control_server and .update_watcher' >/dev/null <<<"$health" \
+  || fail "/healthz?full=1 reports a part down: $health"
+ok "ttyd reachable through the proxy; /healthz reports every part up"
 
 node - "$PORT" <<'EOF' || fail "websocket session through the proxy failed"
 const http = require('http'), crypto = require('crypto');

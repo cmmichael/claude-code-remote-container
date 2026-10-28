@@ -196,6 +196,29 @@ test('an unknown mode refuses everything', async () => {
   } finally { f.stop(); }
 });
 
+test('/healthz: 503 when the terminal is down, JSON detail with full=1', async () => {
+  const dead = await freePort();   // nothing listens here
+  const f = await front({ TTYD_INTERNAL_PORT: String(dead) });
+  try {
+    const r = await get(f.port, '/healthz');
+    assert.strictEqual(r.status, 503);
+    assert.match(r.body, /terminal not reachable/);
+    const j = await get(f.port, '/healthz?full=1');
+    assert.strictEqual(j.status, 503);
+    const h = JSON.parse(j.body);
+    assert.strictEqual(h.ok, false);
+    assert.strictEqual(h.terminal, false);
+    assert.deepStrictEqual(Object.keys(h).sort(), ['auth', 'claude_code', 'ok', 'remote_control_server', 'terminal', 'update_watcher']);
+  } finally { f.stop(); }
+  const up = await front({});
+  try {
+    const h = JSON.parse((await get(up.port, '/healthz?full=1')).body);
+    assert.strictEqual(h.ok, true);
+    assert.strictEqual(h.terminal, true);
+    assert.strictEqual(h.auth, 'none');
+  } finally { up.stop(); }
+});
+
 test('/healthz answers without a user check and logs nothing', async () => {
   const f = await front({ CLAUDE_WEB_AUTH: 'pomerium', CLAUDE_WEB_POMERIUM_JWKS_URL: jwksUrl, CLAUDE_WEB_ALLOWED_USERS: 'me@example.com' });
   try {
