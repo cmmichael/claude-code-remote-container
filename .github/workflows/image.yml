@@ -52,6 +52,11 @@ jobs:
           images: |
             ghcr.io/${{ github.repository }}
             name=docker.io/${{ vars.DOCKERHUB_USERNAME }}/claude-code-remote-container,enable=${{ vars.DOCKERHUB_USERNAME != '' }}
+          # Only main sets :latest (the raw rule below). Without this, the
+          # semver rule adds :latest to every v* tag build, so rebuilding an
+          # old version would move :latest back to it.
+          flavor: |
+            latest=false
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
