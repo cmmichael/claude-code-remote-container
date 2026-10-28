@@ -49,18 +49,21 @@ before(async () => {
 after(() => { ttyd.close(); jwksServer.close(); });
 
 // ---- start a front end with the given env; resolves once it listens --------
+// WEB_PORT=0: the front end binds a free port itself and logs it, so there's
+// no gap between picking a port and listening on it for another process to use.
 async function front(env) {
-  const port = await freePort();
   const child = spawn(process.execPath, [FRONT], {
-    env: { PATH: process.env.PATH, HOME: '/nonexistent', WEB_PORT: String(port), TTYD_INTERNAL_PORT: String(ttydPort), WEB_BADGE_FILE: BADGE, ...env },
+    env: { PATH: process.env.PATH, HOME: '/nonexistent', WEB_PORT: '0', TTYD_INTERNAL_PORT: String(ttydPort), WEB_BADGE_FILE: BADGE, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
   await new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`front did not start: ${out}`)), 5000);
+    const t = setTimeout(() => { child.kill(); reject(new Error(`front did not start within 15s: ${out}`)); }, 15000);
     child.stdout.on('data', (d) => { out += d; if (out.includes('user check:')) { clearTimeout(t); resolve(); } });
     child.stderr.on('data', (d) => { out += d; });
+    child.on('exit', (code) => { clearTimeout(t); reject(new Error(`front exited (${code}): ${out}`)); });
   });
+  const port = +out.match(/listening on :(\d+)/)[1];
   return { port, stop: () => child.kill(), log: () => out };
 }
 
@@ -114,6 +117,9 @@ test('pomerium: valid assertion for an allowed user passes, page and websocket',
   try {
     const h = { 'X-Pomerium-Jwt-Assertion': jwt(good()) };
     assert.strictEqual((await get(f.port, '/', h)).status, 200);
+    const me = await get(f.port, '/api/whoami', h);
+    assert.strictEqual(me.status, 200);
+    assert.deepStrictEqual(JSON.parse(me.body), { auth: 'pomerium', user: 'me@example.com' });
     assert.strictEqual((await get(f.port, '/api/sessions', h)).status, 200);
     assert.strictEqual(await upgrade(f.port, h), 101);
   } finally { f.stop(); }
@@ -139,6 +145,9 @@ test('pomerium: refuses missing, forged, expired, wrong-audience, wrong-alg, unk
       assert.strictEqual((await get(f.port, '/', h)).status, 403, `page: ${name}`);
       assert.strictEqual(await upgrade(f.port, h), 403, `websocket: ${name}`);
     }
+    const wrongAud = await get(f.port, '/api/whoami', { 'X-Pomerium-Jwt-Assertion': jwt(good({ aud: 'other.example.com' })) });
+    assert.strictEqual(wrongAud.status, 403);
+    assert.match(wrongAud.body, /audience other\.example\.com is not term\.example\.com/);
     // domain wildcard
     assert.strictEqual((await get(f.port, '/', { 'X-Pomerium-Jwt-Assertion': jwt(good({ email: 'a@team.example.com' })) })).status, 200);
     assert.strictEqual((await get(f.port, '/', { 'X-Pomerium-Jwt-Assertion': jwt(good({ email: 'a@evilteam.example.com' })) })).status, 403);

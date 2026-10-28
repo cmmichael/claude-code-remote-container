@@ -1,35 +1,65 @@
-# claude-code-web
+<p align="center"><img src="site/assets/logo.svg" width="96" alt="claude-code-web logo"></p>
 
-Claude Code in a container that is always on:
+<h1 align="center">claude-code-web</h1>
 
-- **Web terminal.** A persistent tmux session served by [ttyd](https://github.com/tsl0922/ttyd) on port 7681. Closing the browser tab doesn't stop anything; reopening it reattaches.
-- **Resumes itself.** The session restarts automatically and resumes the same conversation, across crashes and container restarts.
-- **Remote Control.** The web-terminal session also appears in claude.ai/code and the Claude app, and a separate Remote Control server lets you start new sessions from there.
-- **Applies updates.** Claude Code downloads updates in the background. A watcher restarts idle sessions onto the new version, so "restart to update" never piles up.
+<p align="center"><b>Claude Code on your home server. In a browser tab, and in the Claude app.</b></p>
+
+<p align="center">
+<a href="https://github.com/cmmichael/claude-code-web/actions/workflows/ci.yml"><img src="https://github.com/cmmichael/claude-code-web/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="https://github.com/cmmichael/claude-code-web/releases"><img src="https://img.shields.io/github/v/release/cmmichael/claude-code-web?sort=semver" alt="Release"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT licence"></a>
+</p>
+
+A lightweight container for a NAS or any always-on box. It keeps Claude Code running next to your files and containers, opens it in any browser, connects it to the Claude app with Remote Control, and installs Claude Code updates while you're away.
+
+![Claude Code reviewing a NAS docker-compose.yml in the web terminal](site/assets/terminal.svg)
+
+## Who it's for
+
+| You're on | Use |
+| --- | --- |
+| **A Mac or PC in front of you** | The Claude desktop app, or Claude Code in your own terminal. That's the better experience there, and you don't need this. |
+| **A NAS or home server** (Synology, Unraid, TrueNAS, a Raspberry Pi, a mini PC) | **This.** Claude Code lives where your files and containers are, is always on, and you reach it from a browser or your phone. |
+
+Typical jobs: tidy a compose stack, read container logs and fix what's broken, reorganise a media library, review a config before applying it, or keep a long task going while you check in from the Claude app.
+
+## What you get
+
+- **Persistent web terminal.** tmux behind [ttyd](https://github.com/tsl0922/ttyd). Close the tab or switch devices; the session keeps running and you reattach.
+- **Built for the Claude app.** Remote Control is on. The terminal session appears in the Claude app and on claude.ai, and you can start new sessions from your phone. A badge in the terminal lists those app sessions.
+- **Picks up where you were.** Restarts and rebuilds resume the same conversation by its id.
+- **Updates without the button.** Claude Code downloads updates in the background. The container moves idle sessions onto a new release, after checking that the release runs.
+- **Checks who you are.** Behind Pomerium or Tailscale, the container verifies the signed identity on every request, websockets included.
+- **Server manners.** Runs as any UID/GID, stops cleanly, reports health, and copy and paste reach your clipboard.
 
 ## Quick start
 
 ```sh
-cp .env.example .env            # set PUID/PGID, WORKSPACE_DIR, TTYD_CREDENTIAL
+git clone https://github.com/cmmichael/claude-code-web && cd claude-code-web
+cp .env.example .env            # set PUID/PGID (owner of your files) and WORKSPACE_DIR
 mkdir -p config workspace
 sudo chown "$(id -u):$(id -g)" config workspace   # must match PUID/PGID
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open http://127.0.0.1:7681 (or your proxied URL). On first start:
+Open http://127.0.0.1:7681 on that machine. On first start:
 
 1. Run `/login` with a claude.ai account. Remote Control needs one; API keys don't work for it.
 2. Accept the trust prompt for `/workspace`.
 
-The Remote Control server retries every 30 seconds and picks up the login by itself.
+The Remote Control server retries every 30 seconds and picks up the login by itself. Within a minute the session shows up in the Claude app.
 
-## Exposing it
+`docker compose up -d` builds the image locally. To use the published image instead, see [Images and updates](#images-and-updates).
 
-The web terminal is a shell with your Claude login. The compose file binds it to `127.0.0.1` only. To reach it from elsewhere, put an authenticating reverse proxy in front:
+**Guides:** [Synology](docs/synology.md) · [Behind Pomerium](docs/pomerium.md) · [Behind Tailscale](docs/tailscale.md)
 
-- `examples/pomerium-route.yaml` for Pomerium (identity-aware, recommended).
-- `examples/caddy.Caddyfile` for Caddy with basic auth.
-- Or set `TTYD_CREDENTIAL=user:password` for ttyd's own basic auth, only over TLS.
+## Reaching it from elsewhere
+
+The web terminal is a shell with your Claude login. The compose file publishes it on `127.0.0.1` only. To reach it from other devices, put an authenticating proxy in front, and turn on the container's own check (next section):
+
+- **Pomerium**, identity-aware with your Google/GitHub/OIDC login: [docs/pomerium.md](docs/pomerium.md), example in `examples/pomerium/`.
+- **Tailscale**, on your tailnet only: [docs/tailscale.md](docs/tailscale.md), example in `examples/tailscale/`.
+- **Caddy with basic auth**: `examples/caddy.Caddyfile`. Or set `TTYD_CREDENTIAL=user:password` for ttyd's own basic auth, only over TLS.
 
 The proxy must allow websockets.
 
@@ -45,9 +75,20 @@ The proxy in front decides who reaches the container. The container can also che
 
 `CLAUDE_WEB_ALLOWED_USERS` lists who may in: exact addresses, `*@example.com` for a domain, or `*` for anyone the proxy authenticated. Empty means nobody. Everyone else gets 403, and the container log says who was refused and why, once a minute per user and reason.
 
-- **Pomerium.** See `examples/pomerium-route.yaml`. Point `CLAUDE_WEB_POMERIUM_JWKS_URL` at `https://<route host>/.well-known/pomerium/jwks.json`. The key URL is always configured, never taken from the request, so a forged Host header can't supply its own keys.
-- **Tailscale.** See `examples/tailscale/`. A Tailscale sidecar serves the terminal on your tailnet with HTTPS, and the container shares its network, so Tailscale Serve is the only thing that can reach it on `127.0.0.1` and set `Tailscale-User-Login`.
+- **Pomerium.** See [docs/pomerium.md](docs/pomerium.md) and `examples/pomerium/`. Point `CLAUDE_WEB_POMERIUM_JWKS_URL` at `https://<route host>/.well-known/pomerium/jwks.json`. The key URL is always configured, never taken from the request, so a forged Host header can't supply its own keys.
+- **Tailscale.** See [docs/tailscale.md](docs/tailscale.md) and `examples/tailscale/`. A Tailscale sidecar serves the terminal on your tailnet with HTTPS, and the container shares its network, so Tailscale Serve is the only thing that can reach it on `127.0.0.1` and set `Tailscale-User-Login`.
 - **Other proxies** that set a user header (oauth2-proxy's `X-Forwarded-Email`, Authelia's `Remote-User`) work with `header` mode. List the proxy's address in `CLAUDE_WEB_TRUSTED_PROXIES`, and make sure nothing else can reach port 7681.
+
+### Check your setup
+
+`/api/whoami` answers with who the container thinks you are. Open it through your proxy:
+
+```sh
+curl -s https://claude.example.com/api/whoami
+# {"auth":"pomerium","user":"you@example.com"}
+```
+
+A refused request answers 403 with the reason, for example `audience other.example.com is not claude.example.com`, `request from 172.18.0.5, not a trusted proxy`, or `bob@example.com is not in CLAUDE_WEB_ALLOWED_USERS`. The container log has the same line. A request that skips the proxy should get 403 too: try `curl -s http://<container-ip>:7681/api/whoami` from another container on the same network.
 
 ## Copy and paste
 
@@ -102,13 +143,36 @@ Sessions started from claude.ai/code or the Claude app run headless under the Re
 - Claude Code installs in the background on first start, so the web terminal is up at once. The session waits for the binary, and Ctrl-C there gives a shell.
 - The image's health check reports healthy while the web terminal answers.
 
+## Compared with other projects
+
+| | claude-code-web | [HolyClaude](https://github.com/CoderLuii/HolyClaude) | [claudebox](https://github.com/RchGrav/claudebox) | [beevelop/docker-claude](https://github.com/beevelop/docker-claude) |
+| --- | --- | --- | --- | --- |
+| What it is | Claude Code on a server, in the browser and the Claude app | All-in-one AI workstation | Isolated dev sandbox with language profiles | Headless Remote Control server |
+| Interface | Claude Code's own terminal UI in a browser tab | CloudCLI web app with its own account | Your local terminal | Claude app only |
+| Claude app / Remote Control | Terminal session and new sessions | - | - | New sessions |
+| Resumes your conversation | By session id | - | - | - |
+| Applies Claude Code updates | When idle, after a run check | With image releases | On rebuild | - |
+| Built-in access check | Pomerium assertion or trusted header | Web app login | Local only | - |
+
+From each project's README, October 2026. For a full browser workstation with many AI tools, HolyClaude is the richer choice. For a per-project sandbox on your laptop, use claudebox. This project does one thing: Claude Code's own interface on a server, wired into the Claude app.
+
 ## What's private
 
 Everything personal lives in `./config` (the container's `$HOME`): Claude credentials, transcripts and settings. It is gitignored. Never commit or share it.
 
-## Prebuilt image
+## Images and updates
 
-Every push to `main` builds `ghcr.io/<owner>/claude-code-web` for amd64 and arm64 (see `.github/workflows/image.yml`). The package is private while the repo is. To use it, run `docker login ghcr.io` with a token that has `read:packages`, then swap `build: .` for that `image:` line in `docker-compose.yml`.
+Every merge to `main` is a release, published for amd64 and arm64:
+
+| Tag | Moves |
+| --- | --- |
+| `ghcr.io/cmmichael/claude-code-web:latest` | with every release |
+| `:0.2` (major.minor) | with patch releases of that minor version |
+| `:0.2.0` | never |
+
+To use it, replace `build: .` in `docker-compose.yml` with `image: ghcr.io/cmmichael/claude-code-web:latest` (or a pinned tag). To apply new releases unattended, run [Watchtower](https://containrrr.dev/watchtower/) with `WATCHTOWER_TIMEOUT=30s`, so it gives the container's clean stop time to finish. Claude Code itself updates inside the container either way; the image only carries the terminal, the scripts and the tools around Claude.
+
+A weekly rebuild picks up Debian security updates. Each image carries an SBOM and build provenance.
 
 ## SSH as an arbitrary user
 
@@ -121,3 +185,9 @@ The container runs as whatever `PUID` you choose, which has no entry in `/etc/pa
 - **Images** (`.github/workflows/image.yml`) publish to GHCR from `main`, from `v*` tags, weekly (so Debian security updates land), and on demand for any branch. Each image carries an SBOM and provenance attestation.
 - **Pinning.** Base images are pinned by digest and actions by commit. Dependabot opens weekly grouped PRs to move them.
 - **Releases.** Every merge to `main` is a release: the next semver tag, a GitHub Release whose notes are the merged PR's title and description, and the image just built tagged `:<x.y.z>` and `:<x.y>`. It is a patch release by default. Label the PR `release:minor` or `release:major` to bump further, or `release:skip` for changes that ship nothing, such as docs or CI. Pin a host to a release with `ghcr.io/<owner>/claude-code-web:<x.y.z>`, or check out the tag and build it.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+An independent community project, not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic. The container installs Claude Code with Anthropic's official installer, under Anthropic's terms.

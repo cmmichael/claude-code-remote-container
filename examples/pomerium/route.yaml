@@ -1,4 +1,4 @@
-# Pomerium route for the web terminal. Add under `routes:` in your Pomerium config.
+# Just the route, for an existing Pomerium. Add it under `routes:`.
 # The container must share a Docker network with Pomerium (or use host:port).
 # Keep the policy narrow: whoever passes it gets a shell with your Claude login.
 - from: https://claude.example.com

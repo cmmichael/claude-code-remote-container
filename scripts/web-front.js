@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Front end for the web terminal. Listens on the public port (7681) and:
 //   GET /api/sessions  -> the Remote Control server's live sessions as JSON
+//   GET /api/whoami    -> who the user check sees ({auth, user}); for checking a proxy setup
 //   GET /              -> ttyd's page with the sessions badge (web-badge.html) added
 //   anything else      -> proxied to ttyd on 127.0.0.1:$TTYD_INTERNAL_PORT,
 //                         websocket upgrades included
@@ -230,17 +231,24 @@ function logDenied(req, who) {
   denials.set(k, Date.now());
   log(`refused ${who.user || 'anonymous'} ${req.method} ${req.url.split('?')[0]}: ${who.reason}`);
 }
-const DENIED_BODY = 'Not authorized for this terminal.\n';
+// The reason goes in the body so a setup can be checked from the browser. It
+// names the check that failed (audience, kid prefix, proxy address, user),
+// never key material or configuration secrets.
+const deniedBody = (who) => `Not authorized for this terminal: ${who.reason}.\nSee "Allowed users" in the README.\n`;
 
 // ---- server ----------------------------------------------------------------
 const server = http.createServer(async (req, res) => {
   const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
   if (!who.ok) {
     logDenied(req, who);
-    res.writeHead(403, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
-    return res.end(DENIED_BODY);
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(deniedBody(who));
   }
   const url = req.url.split('?')[0];
+  if (url === '/api/whoami') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ auth: AUTH, user: who.user || null }));
+  }
   if (url === '/api/sessions') {
     if (!authorized(req)) {
       res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="ttyd"' });
@@ -284,7 +292,8 @@ server.on('upgrade', async (req, sock, head) => {
   const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
   if (!who.ok) {
     logDenied(req, who);
-    sock.end(`HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: ${DENIED_BODY.length}\r\nConnection: close\r\n\r\n${DENIED_BODY}`);
+    const body = Buffer.from(deniedBody(who));
+    sock.end(`HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n${body}`);
     return;
   }
   const up = net.connect(TTYD_PORT, '127.0.0.1', () => {
@@ -303,7 +312,7 @@ server.on('upgrade', async (req, sock, head) => {
 
 server.keepAliveTimeout = 65000;
 server.listen(PORT, '0.0.0.0', () => {
-  log(`listening on :${PORT}, terminal on 127.0.0.1:${TTYD_PORT}`);
+  log(`listening on :${server.address().port}, terminal on 127.0.0.1:${TTYD_PORT}`);
   log(AUTH === 'none' ? 'user check: off (CLAUDE_WEB_AUTH=none)' : `user check: ${AUTH}, allowed: ${ALLOWED.join(', ') || '(nobody)'}`);
   if (AUTH === 'pomerium' && JWKS_URL) fetchJwks();
 });

@@ -1,0 +1,17 @@
+# Minimal Pomerium config for claude-code-web. Secrets come from pomerium.env.
+# Reference: https://www.pomerium.com/docs/reference
+authenticate_service_url: https://auth.example.com
+autocert: true
+autocert_dir: /data/autocert
+idp_provider: google            # or github, oidc, ... (IDP_CLIENT_ID/SECRET in pomerium.env)
+
+routes:
+  - from: https://claude.example.com
+    to: http://claude:7681
+    allow_websockets: true      # the terminal is a websocket
+    pass_identity_headers: true # sends X-Pomerium-Jwt-Assertion, which the container verifies
+    policy:
+      - allow:
+          or:
+            - email:
+                is: you@example.com
