@@ -28,8 +28,11 @@ done
 # `claude -p` that Claude runs as a tool, or one typed in the Ctrl-C shell,
 # overwrite session-id with its one-off conversation, and the next restart
 # would resume that.
-case $(tr '\0' ' ' < "/proc/$(ppid_of "$pid")/cmdline" 2>/dev/null) in
-  *claude-session*)
+# The parent must be exactly `<interpreter> /usr/local/bin/claude-session`: a
+# tool shell whose command merely mentions claude-session does not count.
+mapfile -d '' -t argv < "/proc/$(ppid_of "$pid")/cmdline" 2>/dev/null
+case "${#argv[@]}:${argv[1]:-}" in
+  2:/usr/local/bin/claude-session)
     mkdir -p "$d" 2>/dev/null || exit 0
     date +%s > "$d/$1"
     jq -r '.session_id // empty' > "$d/session-id.tmp" 2>/dev/null \
