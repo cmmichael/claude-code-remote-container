@@ -1,0 +1,7 @@
+# Keep the build context to what the Dockerfile copies. ./config is the
+# container's HOME (Claude login, transcripts) and must never reach a build.
+*
+!Dockerfile
+!scripts/
+!ttyd-client/
+!tmux.conf

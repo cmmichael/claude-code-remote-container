@@ -1,0 +1,6 @@
+# Scripts run inside a Linux container: CRLF line endings would break them.
+* text=auto eol=lf
+*.sh text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+Dockerfile text eol=lf

@@ -1,0 +1,18 @@
+# Weekly update PRs for the pinned GitHub Actions and the Dockerfile's base
+# images (they are pinned by digest; Dependabot moves the pins).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]

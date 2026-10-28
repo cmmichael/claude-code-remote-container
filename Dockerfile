@@ -8,7 +8,7 @@
 # platform even for the arm64 image. Ported from the Home Assistant add-on
 # con-ant/hass-addons (claudecode/Dockerfile). Drop the stage and --index once a
 # ttyd release newer than 1.7.7 ships, but keep the shim or re-check it.
-FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS ttyd-client
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS ttyd-client
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 ARG TTYD_CLIENT_COMMIT=2922cb89f518bae4d0fcf4d757a7419638fc71fc
@@ -29,7 +29,8 @@ RUN npm install -g corepack@0.35.0 && corepack enable \
 COPY ttyd-client/ /ttyd-client/
 RUN node /ttyd-client/inject-wasm-shim.js /ttyd/html/dist/inline.html /ttyd-client/wasm-shim.html
 
-FROM debian:bookworm-slim
+# Base images are pinned by digest; Dependabot opens a PR when they move.
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget gawk git jq less nano openssh-client procps ripgrep \

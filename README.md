@@ -95,3 +95,10 @@ Every push to `main` builds `ghcr.io/<owner>/claude-code-web` for amd64 and arm6
 ## SSH as an arbitrary user
 
 The container runs as whatever `PUID` you choose, which has no entry in `/etc/passwd`. OpenSSH refuses to run without one. `ssh`, `scp`, `sftp`, `ssh-keygen` and `ssh-add` therefore go through `scripts/with-passwd.sh`, which uses nss_wrapper to supply an entry for that process only. Keys and `~/.ssh/config` live in `./config/.ssh` and persist.
+
+## Development
+
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`. It lints the scripts (shellcheck), the Dockerfile (hadolint) and the workflows (actionlint), then builds the image and runs `tests/smoke.sh` against it.
+- **Smoke test.** `tests/smoke.sh` starts the image with a stand-in `claude`, so it needs no login or download. It checks health, the terminal page and badge, `/api/sessions`, a websocket session through the proxy, the hooks and channel in `settings.json`, SSH for an unknown uid, the update watcher, and a clean `docker stop`. Run it locally with `docker build -t claude-code-web:ci . && tests/smoke.sh`.
+- **Images** (`.github/workflows/image.yml`) publish to GHCR from `main`, from `v*` tags, weekly (so Debian security updates land), and on demand for any branch. Each image carries an SBOM and provenance attestation.
+- **Pinning.** Base images are pinned by digest and actions by commit. Dependabot opens weekly grouped PRs to move them.
