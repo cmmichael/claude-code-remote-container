@@ -5,6 +5,10 @@ name: image
 # - tags v*: :<version>
 # - weekly: rebuilds main so Debian security updates reach :latest
 # - manual: any branch, as :sha-<commit> (for trying a branch on a host)
+# Every push to main is also a release (job "release"): the next semver tag,
+# a GitHub Release with the merged PR's title and description as notes, and
+# the image just built tagged :<x.y.z> and :<x.y>. Patch by default; label the
+# PR release:minor, release:major, or release:skip (docs, CI-only changes).
 on:
   push:
     branches: [main]
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # the release job creates tags and releases
   packages: write
 
 concurrency:
@@ -56,3 +60,81 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - name: next version
+        id: v
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null)][0] // empty')
+          labels=""
+          if [ -n "$pr" ]; then labels=$(jq -r '[.labels[]?.name] | join(" ")' <<<"$pr"); fi
+          if [[ " $labels " == *" release:skip "* ]]; then
+            echo "release:skip on the PR; no release"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          prev=$(gh api "repos/$REPO/tags" --paginate --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$prev" ]; then
+            next=0.1.0
+          else
+            IFS=. read -r ma mi pa <<<"${prev#v}"
+            if   [[ " $labels " == *" release:major "* ]]; then next="$((ma + 1)).0.0"
+            elif [[ " $labels " == *" release:minor "* ]]; then next="$ma.$((mi + 1)).0"
+            else next="$ma.$mi.$((pa + 1))"; fi
+          fi
+          {
+            echo "skip=false"
+            echo "prev=$prev"
+            echo "version=$next"
+            echo "minor=${next%.*}"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$pr" ]; then
+            jq -r '"\(.title) (#\(.number))"' <<<"$pr" > title.txt
+            jq -r '.body // ""' <<<"$pr" > notes.md
+          else
+            git_msg=$(gh api "repos/$REPO/commits/$SHA" --jq '.commit.message')
+            head -1 <<<"$git_msg" > title.txt
+            tail -n +3 <<<"$git_msg" > notes.md
+          fi
+          echo "v$next: $(cat title.txt)"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        if: steps.v.outputs.skip == 'false'
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        if: steps.v.outputs.skip == 'false'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: tag the image this run built
+        if: steps.v.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "$IMAGE:${{ steps.v.outputs.version }}" \
+            -t "$IMAGE:${{ steps.v.outputs.minor }}" \
+            "$IMAGE:sha-${SHA::7}"
+          docker buildx imagetools inspect "$IMAGE:${{ steps.v.outputs.version }}" --format '{{json .Manifest.Digest}}' | tr -d '"' > digest.txt
+      - name: GitHub release
+        if: steps.v.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          v="v${{ steps.v.outputs.version }}"
+          prev="${{ steps.v.outputs.prev }}"
+          {
+            cat notes.md
+            echo
+            echo "---"
+            echo
+            echo "**Image:** \`$IMAGE:${{ steps.v.outputs.version }}\` (also \`:${{ steps.v.outputs.minor }}\`, \`:latest\`, \`:sha-${SHA::7}\`)"
+            echo "**Digest:** \`$(cat digest.txt)\`"
+            if [ -n "$prev" ]; then echo "**Changes:** https://github.com/$REPO/compare/$prev...$v"; fi
+          } > release.md
+          gh release create "$v" --repo "$REPO" --target "$SHA" --title "$v: $(cat title.txt)" --notes-file release.md
