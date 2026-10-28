@@ -8,6 +8,8 @@
 # Needs docker, curl, jq and node on the host. Exits non-zero on the first
 # failed check and prints the container log.
 set -euo pipefail
+# No `cmd | grep -q` below: grep -q exits at the first match, the writer gets
+# SIGPIPE, and pipefail turns a found line into a failure. Capture, then grep.
 
 IMAGE="${IMAGE:-claude-code-web:ci}"
 NAME="claude-smoke-$$"
@@ -108,13 +110,14 @@ jq -e '.hooks.UserPromptSubmit[0].hooks[0].command == "/usr/local/bin/claude-ses
        and .autoUpdatesChannel == "stable"' "$settings" >/dev/null || fail "settings.json hooks/channel wrong: $(cat "$settings")"
 ok "hooks and update channel written to settings.json"
 
-docker exec "$NAME" ssh -G example.org 2>&1 | grep -q '^user ' || fail "ssh can't resolve a user for an unknown uid"
+sshcfg=$(docker exec "$NAME" ssh -G example.org 2>&1) || fail "ssh -G failed: $sshcfg"
+grep -q '^user ' <<<"$sshcfg" || fail "ssh can't resolve a user for an unknown uid"
 ok "ssh works for a uid without a passwd entry"
 
 docker exec "$NAME" pgrep -f '^/bin/bash /usr/local/bin/claude-update-watcher' >/dev/null || fail "update watcher not running"
 ok "update watcher running"
 
-if docker logs "$NAME" 2>&1 | grep -q 'could not parse'; then fail "entrypoint could not parse settings.json"; fi
+if grep -q 'could not parse' <<<"$(docker logs "$NAME" 2>&1)"; then fail "entrypoint could not parse settings.json"; fi
 ok "no entrypoint errors"
 
 # --- clean stop ------------------------------------------------------------------
@@ -122,10 +125,11 @@ t0=$(date +%s)
 docker stop -t 30 "$NAME" >/dev/null
 dt=$(( $(date +%s) - t0 ))
 code=$(docker inspect -f '{{.State.ExitCode}}' "$NAME")
-docker logs "$NAME" 2>&1 | grep -q '\[claude-web\] stopping' || fail "on_stop never ran"
+logs=$(docker logs "$NAME" 2>&1)
+grep -q '\[claude-web\] stopping' <<<"$logs" || fail "on_stop never ran"
 [ "$code" = 143 ] || fail "exit code $code after stop, expected 143"
 [ "$dt" -lt 25 ] || fail "stop took ${dt}s (Docker's kill would have hit at 30s)"
-if docker logs "$NAME" 2>&1 | grep -q 'did not exit within'; then fail "Claude did not exit within the grace period"; fi
+if grep -q 'did not exit within' <<<"$logs"; then fail "Claude did not exit within the grace period"; fi
 ok "clean stop in ${dt}s with exit 143"
 
 echo "all $pass checks passed"
