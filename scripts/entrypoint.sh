@@ -17,7 +17,7 @@ export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
 rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
-cd /workspace
+cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
 if [ ! -w "$HOME" ]; then
   echo "[claude-web] $HOME is not writable by uid $(id -u); fix ownership of the config volume" >&2
