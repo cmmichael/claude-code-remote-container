@@ -21,7 +21,14 @@ A lightweight container for a NAS or any always-on box. It keeps Claude Code run
 | **A Mac or PC in front of you** | The Claude desktop app, or Claude Code in your own terminal. That's the better experience there, and you don't need this. |
 | **A NAS or home server** (Synology, Unraid, TrueNAS, a Raspberry Pi, a mini PC) | **This.** Claude Code lives where your files and containers are, is always on, and you reach it from a browser or your phone. |
 
-Typical jobs: tidy a compose stack, read container logs and fix what's broken, reorganise a media library, review a config before applying it, or keep a long task going while you check in from the Claude app.
+Mount the folder your configs live in, then ask. For example:
+
+- **Your Docker stack:** "List every published port and Docker-socket mount in docker-compose.yaml, and say which you'd tighten."
+- **Your proxy:** "Add a Pomerium route for jellyfin.example.com with the same policy as photos. Back up the config first."
+- **A broken container**, with read-only Docker access: "paperless restarted 30 times today. Read its logs, find the cause, propose the smallest fix."
+- **A Raspberry Pi:** "List Home Assistant automations that reference entities that no longer exist."
+
+More prompts, and compose recipes for a Synology and a Raspberry Pi, are in [docs/use-cases.md](docs/use-cases.md).
 
 ## What you get
 
@@ -51,7 +58,7 @@ The Remote Control server retries every 30 seconds and picks up the login by its
 
 `docker compose up -d` builds the image locally. To use the published image instead, see [Images and updates](#images-and-updates).
 
-**Guides:** [Synology](docs/synology.md) · [Behind Pomerium](docs/pomerium.md) · [Behind Tailscale](docs/tailscale.md)
+**Guides:** [Synology](docs/synology.md) · [Behind Pomerium](docs/pomerium.md) · [Behind Tailscale](docs/tailscale.md) · [Use cases and recipes](docs/use-cases.md)
 
 ## Reaching it from elsewhere
 

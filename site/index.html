@@ -71,6 +71,8 @@
   .steps li { counter-increment: s; position: relative; padding-left: 40px; margin: 0 0 12px; }
   .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #111; font-weight: 700; font-size: 14px; display: grid; place-items: center; }
   .note { font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .uc .where { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .uc blockquote { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg2); border-radius: 0 8px 8px 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--fg); }
   footer { padding: 36px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
   footer p { margin: 4px 0; }
   @media (max-width: 860px) { .grid { grid-template-columns: 1fr 1fr; } }
@@ -83,6 +85,7 @@
     <a class="brand" href="#"><img src="assets/logo.svg" alt="">claude-code-web</a>
     <nav>
       <a class="hide-sm" href="#who">Who it's for</a>
+      <a class="hide-sm" href="#uses">Uses</a>
       <a class="hide-sm" href="#compare">Compare</a>
       <a href="#start">Get started</a>
       <a href="https://github.com/cmmichael/claude-code-web">GitHub</a>
@@ -125,7 +128,23 @@
   </div>
 </section>
 
-<section class="alt">
+<section class="alt" id="uses">
+  <div class="wrap">
+    <h2>What you'll use it for</h2>
+    <p class="sub">Mount the folder your configs live in, then ask. Claude Code works on them in place, on the machine that runs them.</p>
+    <div class="grid">
+      <div class="card uc"><h3>Your Docker stack</h3><p class="where">Synology <code>/volume1/docker</code> · Pi <code>~/docker</code></p><p>Review exposure, add services in the house style, move secrets out of compose files.</p><blockquote>List every published port and socket mount, and say which you'd tighten.</blockquote></div>
+      <div class="card uc"><h3>Pomerium, Caddy, Traefik</h3><p class="where">proxy config folder</p><p>Add a route, explain a sign-in loop, audit who can reach what, with a backup before every edit.</p><blockquote>Add a route for jellyfin.example.com with the same policy as photos. Back up first.</blockquote></div>
+      <div class="card uc"><h3>Why is it restarting?</h3><p class="where">read-only Docker access</p><p>Through a restricted socket proxy, Claude reads logs and inspects containers, and can't create anything.</p><blockquote>paperless restarted 30 times today. Find the cause and the smallest fix.</blockquote></div>
+      <div class="card uc"><h3>Monitoring and backups</h3><p class="where">compose labels, sidecars</p><p>Monitors for every web UI, and nightly database dumps that alert you when they stop.</p><blockquote>Add a monitor label to every service with a web UI that lacks one.</blockquote></div>
+      <div class="card uc"><h3>Home Assistant, Pi-hole</h3><p class="where">a Raspberry Pi's config folders</p><p>Find dead entities in automations, fix slow local DNS, tidy YAML that has grown for years.</p><blockquote>List automations that reference entities that no longer exist.</blockquote></div>
+      <div class="card uc"><h3>From your phone</h3><p class="where">the Claude app</p><p>Start a session on the server from the app, or pick up the terminal one. Long jobs keep going in your pocket.</p><blockquote>Commit the route change on its own, with a message saying why.</blockquote></div>
+    </div>
+    <p class="note">More prompts and the compose recipes for Synology and Raspberry Pi: <a href="https://github.com/cmmichael/claude-code-web/blob/main/docs/use-cases.md">docs/use-cases.md</a>.</p>
+  </div>
+</section>
+
+<section>
   <div class="wrap">
     <h2>One terminal, done properly</h2>
     <p class="sub">No separate web app to learn or sign in to. You get Claude Code's own interface, and the plumbing that makes it pleasant to run on a server.</p>
@@ -143,7 +162,7 @@
   </div>
 </section>
 
-<section>
+<section class="alt">
   <div class="wrap">
     <h2>How it fits together</h2>
     <p class="sub">Your proxy signs you in. The container checks it again, then hands you the terminal. The Claude app talks to the same machine through Remote Control, outbound only, with nothing extra exposed.</p>
@@ -155,7 +174,7 @@
   </div>
 </section>
 
-<section id="compare" class="alt">
+<section id="compare">
   <div class="wrap">
     <h2>How it compares</h2>
     <p class="sub">Other good projects put Claude Code in a container, and they aim at different things. This one does a single job: Claude Code's own interface on a server, wired into the Claude app.</p>
@@ -178,7 +197,7 @@
   </div>
 </section>
 
-<section id="start">
+<section id="start" class="alt">
   <div class="wrap">
     <h2>Get started</h2>
     <p class="sub">Any machine with Docker Compose. Synology users: create a project in Container Manager with the same compose file.</p>
