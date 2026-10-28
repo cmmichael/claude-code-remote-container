@@ -2,6 +2,8 @@
 // Front end for the web terminal. Listens on the public port (7681) and:
 //   GET /api/sessions  -> the Remote Control server's live sessions as JSON
 //   GET /api/whoami    -> who the user check sees ({auth, user}); for checking a proxy setup
+//   GET /healthz       -> 200 "ok" when the terminal answers, 503 when it doesn't; no user check
+//   GET /healthz?full=1 -> the same as JSON with each part's state, for monitors
 //   GET /              -> ttyd's page with the sessions badge (web-badge.html) added
 //   anything else      -> proxied to ttyd on 127.0.0.1:$TTYD_INTERNAL_PORT,
 //                         websocket upgrades included
@@ -70,7 +72,7 @@ const num = (f) => { const v = parseInt(read(f) || '', 10); return Number.isFini
 
 function sessions() {
   const now = Math.floor(Date.now() / 1000);
-  const server = pids().find((p) => argv(p).join(' ') === 'claude remote-control');
+  const server = pids().find((p) => { const a = argv(p); return a[0] === 'claude' && a[1] === 'remote-control'; });
   if (!server) return { server: { running: false }, sessions: [] };
   const kids = childrenMap();
   const list = [];
@@ -236,8 +238,45 @@ function logDenied(req, who) {
 // never key material or configuration secrets.
 const deniedBody = (who) => `Not authorized for this terminal: ${who.reason}.\nSee "Allowed users" in the README.\n`;
 
+// ---- health -------------------------------------------------------------------
+// ok = the terminal (ttyd) accepts a connection. The rest is detail for a
+// monitor that wants to alert on it: Claude Code missing usually means the
+// first install is still running; no Remote Control server usually means the
+// Claude login needs renewing.
+function ttydUp() {
+  return new Promise((resolve) => {
+    const s = net.connect(TTYD_PORT, '127.0.0.1');
+    const done = (v) => { s.destroy(); resolve(v); };
+    s.setTimeout(1000, () => done(false));
+    s.on('connect', () => done(true));
+    s.on('error', () => done(false));
+  });
+}
+async function health() {
+  const terminal = await ttydUp();
+  const cmd = pids().map((p) => argv(p));
+  let claude = null;
+  try { claude = path.basename(fs.realpathSync(path.join(HOME, '.local', 'bin', 'claude'))); } catch {}
+  return {
+    ok: terminal,
+    terminal,
+    claude_code: claude,
+    remote_control_server: cmd.some((a) => a[0] === 'claude' && a[1] === 'remote-control'),
+    update_watcher: cmd.some((a) => a.some((x) => x.endsWith('claude-update-watcher'))),
+    auth: AUTH,
+  };
+}
+
 // ---- server ----------------------------------------------------------------
 const server = http.createServer(async (req, res) => {
+  // Health: no user check and no log line, so monitors (Docker, Uptime Kuma,
+  // Gatus) can call it with the user check on. It reports states, never data.
+  if (req.url === '/healthz' || req.url.startsWith('/healthz?')) {
+    const h = await health();
+    const full = /[?&]full=1\b/.test(req.url);
+    res.writeHead(h.ok ? 200 : 503, { 'Content-Type': full ? 'application/json' : 'text/plain', 'Cache-Control': 'no-store' });
+    return res.end(full ? JSON.stringify(h) : (h.ok ? 'ok\n' : 'terminal not reachable\n'));
+  }
   const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
   if (!who.ok) {
     logDenied(req, who);

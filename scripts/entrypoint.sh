@@ -122,6 +122,10 @@ if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
+  # --name titles the session the server creates at start (claude.ai/code and
+  # the app); --permission-mode applies to sessions started from the app.
+  rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
+  [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do
       # The server repaints its whole status block about once a second. Print a
@@ -129,7 +133,7 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # the container log shows the connect, the environment link and each
       # session that attaches (again, if it drops and comes back), not the
       # repaints.
-      claude remote-control > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
+      claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
           | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.

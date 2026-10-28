@@ -106,13 +106,16 @@ RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/l
 # TTYD_CREDENTIAL; never publish it to an untrusted network bare.
 EXPOSE 7681
 
-# Healthy while the web terminal answers. Any HTTP reply counts, so a 401 from
-# TTYD_CREDENTIAL is healthy too. The terminal starts within seconds now that
-# the Claude install runs in the background. Docker only reports the status;
-# nothing restarts on it unless something like autoheal watches it.
+# Healthy while the terminal answers. With the web front end (the default),
+# /healthz checks ttyd behind it and skips the user check, so it works and logs
+# nothing with CLAUDE_WEB_AUTH on. With CLAUDE_WEB_FRONT=false, ttyd itself is
+# on 7681 and any reply counts (a 401 from TTYD_CREDENTIAL included).
+# Docker only reports the status; nothing restarts on it unless something like
+# autoheal watches it.
 # Shell form for the `|| exit 1`, which maps any curl failure to Docker's "unhealthy" code.
 # hadolint ignore=DL3025
 HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -so /dev/null http://127.0.0.1:7681/ || exit 1
+    CMD if [ "$CLAUDE_WEB_FRONT" = "false" ]; then curl -so /dev/null http://127.0.0.1:7681/; \
+        else curl -fso /dev/null http://127.0.0.1:7681/healthz; fi || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
