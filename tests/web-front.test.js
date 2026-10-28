@@ -230,7 +230,16 @@ test('/healthz answers without a user check and logs nothing', async () => {
   } finally { f.stop(); }
 });
 
-test('the sessions list finds a Remote Control server started with flags', async () => {
+// A real Remote Control server on the machine running the tests (a dev box
+// that is itself one of these containers) would be found first.
+function otherServerRunning() {
+  const fs = require('fs');
+  return fs.readdirSync('/proc').filter((d) => /^\d+$/.test(d)).some((pid) => {
+    try { const a = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0'); return a[0] === 'claude' && a[1] === 'remote-control'; } catch { return false; }
+  });
+}
+
+test('the sessions list finds a Remote Control server started with flags', { skip: otherServerRunning() && 'a real Remote Control server runs on this machine' }, async () => {
   // A process whose command line is exactly `claude remote-control --name x`:
   // sh runs a script file named remote-control, with argv[0] set to claude.
   const fs = require('fs'), os = require('os');
