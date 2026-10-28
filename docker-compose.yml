@@ -15,6 +15,15 @@ services:
       - CLAUDE_RC_NAME=${CLAUDE_RC_NAME:-claude-web}
       # Optional ttyd basic auth (user:password). Use it when no auth proxy is in front.
       - TTYD_CREDENTIAL=${TTYD_CREDENTIAL:-}
+      # Who may use the web terminal, checked inside the container on every request:
+      # none, pomerium (verify Pomerium's signed assertion) or header (trust an
+      # identity header, e.g. from Tailscale Serve, from CLAUDE_WEB_TRUSTED_PROXIES).
+      - CLAUDE_WEB_AUTH=${CLAUDE_WEB_AUTH:-none}
+      - CLAUDE_WEB_ALLOWED_USERS=${CLAUDE_WEB_ALLOWED_USERS:-}    # you@example.com, *@example.com, or *
+      - CLAUDE_WEB_POMERIUM_JWKS_URL=${CLAUDE_WEB_POMERIUM_JWKS_URL:-}
+      - CLAUDE_WEB_POMERIUM_AUDIENCE=${CLAUDE_WEB_POMERIUM_AUDIENCE:-}
+      - CLAUDE_WEB_AUTH_HEADER=${CLAUDE_WEB_AUTH_HEADER:-Tailscale-User-Login}
+      - CLAUDE_WEB_TRUSTED_PROXIES=${CLAUDE_WEB_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
       # Restart idle sessions onto newly downloaded Claude Code versions
       - CLAUDE_AUTO_UPDATE_RESTART=true
       - CLAUDE_UPDATE_IDLE_SECS=900

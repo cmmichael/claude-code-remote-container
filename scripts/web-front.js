@@ -8,6 +8,13 @@
 // so the terminal can't show them; the badge lists them with a link to
 // claude.ai/code. Data comes from /proc and the session hook's stamps in
 // $HOME/.claude/autoupdate-state/procs/<pid>/last-prompt|last-stop.
+// Optional user check (CLAUDE_WEB_AUTH) on every request, websockets included,
+// before anything reaches ttyd:
+//   pomerium  verify Pomerium's signed X-Pomerium-Jwt-Assertion (ES256, keys
+//             from CLAUDE_WEB_POMERIUM_JWKS_URL, aud = CLAUDE_WEB_POMERIUM_AUDIENCE)
+//   header    trust an identity header (default Tailscale-User-Login) only from
+//             CLAUDE_WEB_TRUSTED_PROXIES
+// and the user must match CLAUDE_WEB_ALLOWED_USERS.
 // No dependencies: Node's standard library only.
 'use strict';
 const http = require('http');
@@ -114,8 +121,125 @@ function inject(html) {
   return at < 0 ? html + badge : html.slice(0, at) + badge + html.slice(at);
 }
 
+// ---- user check (CLAUDE_WEB_AUTH) -------------------------------------------
+const AUTH = (process.env.CLAUDE_WEB_AUTH || 'none').toLowerCase();
+const ALLOWED = (process.env.CLAUDE_WEB_ALLOWED_USERS || '')
+  .split(/[\s,]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+const AUTH_HEADER = (process.env.CLAUDE_WEB_AUTH_HEADER || 'Tailscale-User-Login').toLowerCase();
+const JWKS_URL = process.env.CLAUDE_WEB_POMERIUM_JWKS_URL || '';
+const AUDIENCE = (process.env.CLAUDE_WEB_POMERIUM_AUDIENCE || '').toLowerCase();
+const CLOCK_SKEW = 60;
+
+if (!['none', 'pomerium', 'header'].includes(AUTH)) {
+  log(`CLAUDE_WEB_AUTH=${AUTH} is not none, pomerium or header; refusing every request`);
+}
+if (AUTH !== 'none' && !ALLOWED.length) log('CLAUDE_WEB_ALLOWED_USERS is empty; every user will be refused');
+if (AUTH === 'pomerium' && !JWKS_URL) log('CLAUDE_WEB_POMERIUM_JWKS_URL is not set; every request will be refused');
+if (AUTH === 'pomerium' && !AUDIENCE) log('CLAUDE_WEB_POMERIUM_AUDIENCE is not set; tokens issued for any Pomerium route are accepted');
+
+function allowedUser(user) {
+  if (!user) return false;
+  const u = user.toLowerCase();
+  return ALLOWED.some((a) => a === '*' || a === u || (a.startsWith('*@') && u.endsWith(a.slice(1))));
+}
+
+// Proxies whose identity header is believed (header mode). Default: this
+// container's loopback, i.e. a Tailscale Serve sidecar sharing its network.
+const trusted = new net.BlockList();
+for (const cidr of (process.env.CLAUDE_WEB_TRUSTED_PROXIES || '127.0.0.1/32,::1/128').split(/[\s,]+/).filter(Boolean)) {
+  const [addr, bits] = cidr.split('/');
+  const type = net.isIPv6(addr) ? 'ipv6' : 'ipv4';
+  try { trusted.addSubnet(addr, bits ? +bits : (type === 'ipv6' ? 128 : 32), type); } catch (e) { log(`ignoring trusted proxy ${cidr}: ${e.message}`); }
+}
+function fromTrustedProxy(req) {
+  let ip = req.socket.remoteAddress || '';
+  if (ip.startsWith('::ffff:') && net.isIPv4(ip.slice(7))) ip = ip.slice(7);
+  return trusted.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4');
+}
+
+// Pomerium's signing keys, fetched from the configured URL only (never from a
+// URL derived from the request), cached by kid, refetched at most once a minute
+// when a token names a kid we don't have.
+let jwks = new Map(), jwksAt = 0, jwksFetching = null;
+function fetchJwks() {
+  if (jwksFetching) return jwksFetching;
+  jwksFetching = new Promise((resolve) => {
+    const mod = JWKS_URL.startsWith('https:') ? require('https') : http;
+    const r = mod.get(JWKS_URL, { timeout: 5000 }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) throw new Error(`HTTP ${res.statusCode}`);
+          const next = new Map();
+          for (const k of JSON.parse(Buffer.concat(chunks).toString('utf8')).keys || []) {
+            if (k.kty === 'EC' && k.crv === 'P-256' && k.kid) next.set(k.kid, crypto.createPublicKey({ key: k, format: 'jwk' }));
+          }
+          jwks = next; jwksAt = Date.now();
+        } catch (e) { log(`JWKS fetch from ${JWKS_URL} failed: ${e.message}`); }
+        resolve();
+      });
+    });
+    r.on('timeout', () => r.destroy(new Error('timeout')));
+    r.on('error', (e) => { log(`JWKS fetch from ${JWKS_URL} failed: ${e.message}`); resolve(); });
+  }).finally(() => { jwksFetching = null; });
+  return jwksFetching;
+}
+const b64json = (part) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+
+async function pomeriumUser(req) {
+  const jwt = req.headers['x-pomerium-jwt-assertion'];
+  if (!jwt || !JWKS_URL) return { reason: jwt ? 'no JWKS URL configured' : 'no Pomerium assertion' };
+  const parts = String(jwt).split('.');
+  if (parts.length !== 3) return { reason: 'malformed assertion' };
+  let header, claims;
+  try { header = b64json(parts[0]); claims = b64json(parts[1]); } catch { return { reason: 'malformed assertion' }; }
+  if (header.alg !== 'ES256') return { reason: `alg ${header.alg} not accepted` };
+  if (!jwks.has(header.kid) && Date.now() - jwksAt > 60000) await fetchJwks();
+  const key = jwks.get(header.kid);
+  if (!key) return { reason: `unknown kid ${String(header.kid).slice(0, 12)}` };
+  const ok = crypto.verify('sha256', Buffer.from(`${parts[0]}.${parts[1]}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(parts[2], 'base64url'));
+  if (!ok) return { reason: 'bad signature' };
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof claims.exp !== 'number' || claims.exp + CLOCK_SKEW < now) return { reason: 'expired assertion' };
+  if (typeof claims.nbf === 'number' && claims.nbf - CLOCK_SKEW > now) return { reason: 'assertion not yet valid' };
+  if (AUDIENCE) {
+    const aud = [].concat(claims.aud || []).map((a) => String(a).toLowerCase());
+    if (!aud.includes(AUDIENCE)) return { reason: `audience ${aud.join(',') || '(none)'} is not ${AUDIENCE}` };
+  }
+  return { user: claims.email || '', reason: claims.email ? '' : 'assertion has no email' };
+}
+
+async function identify(req) {
+  if (AUTH === 'none') return { ok: true };
+  let r;
+  if (AUTH === 'pomerium') r = await pomeriumUser(req);
+  else if (AUTH === 'header') {
+    if (!fromTrustedProxy(req)) r = { reason: `request from ${req.socket.remoteAddress}, not a trusted proxy` };
+    else r = req.headers[AUTH_HEADER] ? { user: String(req.headers[AUTH_HEADER]) } : { reason: `no ${AUTH_HEADER} header` };
+  } else r = { reason: `unknown CLAUDE_WEB_AUTH=${AUTH}` };
+  if (r.user && allowedUser(r.user)) return { ok: true, user: r.user };
+  return { ok: false, user: r.user, reason: r.reason || `${r.user} is not in CLAUDE_WEB_ALLOWED_USERS` };
+}
+
+// One log line per user/reason a minute, so a reconnecting tab doesn't flood the log.
+const denials = new Map();
+function logDenied(req, who) {
+  const k = `${who.user || '-'}|${who.reason}`;
+  if (Date.now() - (denials.get(k) || 0) < 60000) return;
+  denials.set(k, Date.now());
+  log(`refused ${who.user || 'anonymous'} ${req.method} ${req.url.split('?')[0]}: ${who.reason}`);
+}
+const DENIED_BODY = 'Not authorized for this terminal.\n';
+
 // ---- server ----------------------------------------------------------------
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
+  const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
+  if (!who.ok) {
+    logDenied(req, who);
+    res.writeHead(403, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+    return res.end(DENIED_BODY);
+  }
   const url = req.url.split('?')[0];
   if (url === '/api/sessions') {
     if (!authorized(req)) {
@@ -155,7 +279,14 @@ const server = http.createServer((req, res) => {
 });
 
 // Websocket (and any other) upgrade: replay the request to ttyd and splice the sockets.
-server.on('upgrade', (req, sock, head) => {
+server.on('upgrade', async (req, sock, head) => {
+  sock.on('error', () => sock.destroy());
+  const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
+  if (!who.ok) {
+    logDenied(req, who);
+    sock.end(`HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: ${DENIED_BODY.length}\r\nConnection: close\r\n\r\n${DENIED_BODY}`);
+    return;
+  }
   const up = net.connect(TTYD_PORT, '127.0.0.1', () => {
     let raw = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
     for (let i = 0; i < req.rawHeaders.length; i += 2) raw += `${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`;
@@ -171,5 +302,9 @@ server.on('upgrade', (req, sock, head) => {
 });
 
 server.keepAliveTimeout = 65000;
-server.listen(PORT, '0.0.0.0', () => log(`listening on :${PORT}, terminal on 127.0.0.1:${TTYD_PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+  log(`listening on :${PORT}, terminal on 127.0.0.1:${TTYD_PORT}`);
+  log(AUTH === 'none' ? 'user check: off (CLAUDE_WEB_AUTH=none)' : `user check: ${AUTH}, allowed: ${ALLOWED.join(', ') || '(nobody)'}`);
+  if (AUTH === 'pomerium' && JWKS_URL) fetchJwks();
+});
 for (const s of ['SIGTERM', 'SIGINT']) process.on(s, () => { server.close(); process.exit(0); });

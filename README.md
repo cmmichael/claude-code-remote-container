@@ -33,6 +33,22 @@ The web terminal is a shell with your Claude login. The compose file binds it to
 
 The proxy must allow websockets.
 
+## Allowed users
+
+The proxy in front decides who reaches the container. The container can also check every request itself, websockets included, before anything reaches the terminal. That keeps the terminal closed to a request that gets to the container some other way: another container on the same network, a published port, or a proxy rule that's too broad.
+
+| `CLAUDE_WEB_AUTH` | Who is the user | Configure |
+| --- | --- | --- |
+| `none` (default) | Nobody is checked | |
+| `pomerium` | The `email` in Pomerium's signed `X-Pomerium-Jwt-Assertion`. The signature (ES256), expiry and audience are verified against Pomerium's keys | `CLAUDE_WEB_POMERIUM_JWKS_URL`, `CLAUDE_WEB_POMERIUM_AUDIENCE` (the route's host). Set `pass_identity_headers: true` on the route |
+| `header` | A header set by a trusted proxy, `Tailscale-User-Login` by default. Believed only from `CLAUDE_WEB_TRUSTED_PROXIES` | `CLAUDE_WEB_AUTH_HEADER`, `CLAUDE_WEB_TRUSTED_PROXIES` (default `127.0.0.1/32,::1/128`) |
+
+`CLAUDE_WEB_ALLOWED_USERS` lists who may in: exact addresses, `*@example.com` for a domain, or `*` for anyone the proxy authenticated. Empty means nobody. Everyone else gets 403, and the container log says who was refused and why, once a minute per user and reason.
+
+- **Pomerium.** See `examples/pomerium-route.yaml`. Point `CLAUDE_WEB_POMERIUM_JWKS_URL` at `https://<route host>/.well-known/pomerium/jwks.json`. The key URL is always configured, never taken from the request, so a forged Host header can't supply its own keys.
+- **Tailscale.** See `examples/tailscale/`. A Tailscale sidecar serves the terminal on your tailnet with HTTPS, and the container shares its network, so Tailscale Serve is the only thing that can reach it on `127.0.0.1` and set `Tailscale-User-Login`.
+- **Other proxies** that set a user header (oauth2-proxy's `X-Forwarded-Email`, Authelia's `Remote-User`) work with `header` mode. List the proxy's address in `CLAUDE_WEB_TRUSTED_PROXIES`, and make sure nothing else can reach port 7681.
+
 ## Copy and paste
 
 tmux and Claude Code both hold the mouse, so a plain drag is tmux's selection, not the browser's. All of these land on your clipboard:
@@ -64,6 +80,8 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
 | `CLAUDE_WEB_FRONT` | `true` | Serve the terminal through the front end that adds the app-sessions badge; `false` lets ttyd take port 7681 directly |
 | `TTYD_INTERNAL_PORT` | 7683 | Loopback port ttyd uses behind the front end |
+| `CLAUDE_WEB_AUTH` | `none` | Check who uses the web terminal: `none`, `pomerium` or `header` (see Allowed users) |
+| `CLAUDE_WEB_ALLOWED_USERS` | empty | Who may use it: addresses, `*@domain`, or `*` |
 | `CLAUDE_STOP_GRACE_SECS` | 20 | How long Claude gets to exit when the container stops. Keep it under `stop_grace_period` (30s) |
 
 Build arguments `INSTALL_DOCKER_CLI` and `INSTALL_GH` (both `true`) control the optional Docker and GitHub CLIs. To let Claude manage containers, point `DOCKER_HOST` at a restricted socket proxy such as `tecnativa/docker-socket-proxy`. Don't mount the raw Docker socket: that is root on the host.
@@ -98,7 +116,7 @@ The container runs as whatever `PUID` you choose, which has no entry in `/etc/pa
 
 ## Development
 
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`. It lints the scripts (shellcheck), the Dockerfile (hadolint) and the workflows (actionlint), then builds the image and runs `tests/smoke.sh` against it.
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`. It lints the scripts (shellcheck), the Dockerfile (hadolint) and the workflows (actionlint), runs the web front end's unit tests (`node --test tests/*.test.js`, no Docker needed), then builds the image and runs `tests/smoke.sh` against it.
 - **Smoke test.** `tests/smoke.sh` starts the image with a stand-in `claude`, so it needs no login or download. It checks health, the terminal page and badge, `/api/sessions`, a websocket session through the proxy, the hooks and channel in `settings.json`, SSH for an unknown uid, the update watcher, and a clean `docker stop`. Run it locally with `docker build -t claude-code-web:ci . && tests/smoke.sh`.
 - **Images** (`.github/workflows/image.yml`) publish to GHCR from `main`, from `v*` tags, weekly (so Debian security updates land), and on demand for any branch. Each image carries an SBOM and provenance attestation.
 - **Pinning.** Base images are pinned by digest and actions by commit. Dependabot opens weekly grouped PRs to move them.

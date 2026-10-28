@@ -26,6 +26,8 @@ jobs:
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
       - name: node --check
         run: node --check scripts/web-front.js && node --check ttyd-client/inject-wasm-shim.js
+      - name: web front end unit tests
+        run: node --test tests/*.test.js
       - name: compose file
         run: docker compose -f docker-compose.yml config -q
 
