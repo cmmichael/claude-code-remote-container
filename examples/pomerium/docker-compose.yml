@@ -1,0 +1,40 @@
+# Pomerium in front of claude-code-web, with the container checking Pomerium's
+# signed assertion itself. Single host, Pomerium's built-in Let's Encrypt.
+#
+#   cp pomerium.env.example pomerium.env   # fill in, see the comments there
+#   docker compose up -d                   # from this folder
+#
+# DNS: point claude.example.com and auth.example.com at this host, and let
+# ports 80 and 443 reach it (Let's Encrypt validates on them).
+services:
+  pomerium:
+    image: pomerium/pomerium:v0.33.6
+    env_file: pomerium.env
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./config.yaml:/pomerium/config.yaml:ro
+      - ./pomerium-data:/data
+    restart: unless-stopped
+
+  claude:
+    build: ../..
+    image: claude-code-web:local
+    init: true
+    stop_grace_period: 30s
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - TZ=${TZ:-UTC}
+      - CLAUDE_RC_NAME=claude-web
+      # Second check inside the container: only requests carrying Pomerium's
+      # signed assertion for this route, for these users, reach the terminal.
+      - CLAUDE_WEB_AUTH=pomerium
+      - CLAUDE_WEB_POMERIUM_JWKS_URL=https://claude.example.com/.well-known/pomerium/jwks.json
+      - CLAUDE_WEB_POMERIUM_AUDIENCE=claude.example.com
+      - CLAUDE_WEB_ALLOWED_USERS=you@example.com
+    volumes:
+      - ../../config:/config
+      - ${WORKSPACE_DIR:-../../workspace}:/workspace
+    # no ports: only Pomerium reaches it, over this compose network
+    restart: unless-stopped

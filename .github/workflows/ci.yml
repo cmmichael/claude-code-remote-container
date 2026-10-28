@@ -26,8 +26,19 @@ jobs:
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
       - name: node --check
         run: node --check scripts/web-front.js && node --check ttyd-client/inject-wasm-shim.js
+      - name: web front end unit tests
+        run: node --test tests/*.test.js
       - name: compose file
         run: docker compose -f docker-compose.yml config -q
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0   # scan every commit, not just the tip
+      - name: gitleaks (full history)
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --redact --verbose --exit-code 1
 
   smoke:
     runs-on: ubuntu-latest

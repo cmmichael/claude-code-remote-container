@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="380" viewBox="0 0 900 380" role="img" aria-label="How claude-code-web fits together" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+  <style>
+    .box { fill: #1c1f24; stroke: #3a3f47; }
+    .hl { fill: #2a2117; stroke: #f0a35e; }
+    .t { fill: #e6e6e6; font-size: 14px; font-weight: 600; }
+    .s { fill: #a1a1aa; font-size: 12px; }
+    .ln { stroke: #6b7280; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+    .ln2 { stroke: #f0a35e; stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; marker-end: url(#a2); }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#6b7280"/></marker>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#f0a35e"/></marker>
+  </defs>
+  <rect width="900" height="380" rx="14" fill="#14161a"/>
+
+  <!-- clients -->
+  <rect class="box" x="24" y="40" width="160" height="62" rx="10"/>
+  <text class="t" x="40" y="66">Browser tab</text><text class="s" x="40" y="86">any device</text>
+  <rect class="box" x="24" y="250" width="160" height="62" rx="10"/>
+  <text class="t" x="40" y="276">Claude app</text><text class="s" x="40" y="296">phone · desktop · claude.ai</text>
+
+  <!-- proxy -->
+  <rect class="box" x="226" y="40" width="160" height="62" rx="10"/>
+  <text class="t" x="242" y="66">Pomerium / Tailscale</text><text class="s" x="242" y="86">sign-in, TLS</text>
+
+  <!-- container -->
+  <rect x="420" y="18" width="456" height="344" rx="14" fill="none" stroke="#3a3f47" stroke-dasharray="6 5"/>
+  <text class="s" x="436" y="40">container (your NAS / home server)</text>
+
+  <rect class="hl" x="436" y="52" width="200" height="74" rx="10"/>
+  <text class="t" x="452" y="78">web front end :7681</text>
+  <text class="s" x="452" y="97">checks who you are</text>
+  <text class="s" x="452" y="113">app-sessions badge</text>
+
+  <rect class="box" x="660" y="52" width="200" height="74" rx="10"/>
+  <text class="t" x="676" y="78">ttyd + tmux</text>
+  <text class="s" x="676" y="97">persistent terminal</text>
+  <text class="s" x="676" y="113">survives closed tabs</text>
+
+  <rect class="hl" x="660" y="150" width="200" height="74" rx="10"/>
+  <text class="t" x="676" y="176">claude (your session)</text>
+  <text class="s" x="676" y="195">resumes by session id</text>
+  <text class="s" x="676" y="211">--remote-control</text>
+
+  <rect class="box" x="436" y="150" width="200" height="74" rx="10"/>
+  <text class="t" x="452" y="176">update watcher</text>
+  <text class="s" x="452" y="195">restarts idle sessions</text>
+  <text class="s" x="452" y="211">onto new releases</text>
+
+  <rect class="hl" x="436" y="250" width="200" height="74" rx="10"/>
+  <text class="t" x="452" y="276">claude remote-control</text>
+  <text class="s" x="452" y="295">starts new sessions</text>
+  <text class="s" x="452" y="311">from the app</text>
+
+  <rect class="box" x="660" y="250" width="200" height="74" rx="10"/>
+  <text class="t" x="676" y="276">/workspace</text>
+  <text class="s" x="676" y="295">your files, mounted</text>
+  <text class="s" x="676" y="311">config in ./config</text>
+
+  <path class="ln" d="M184 71 H222"/>
+  <path class="ln" d="M386 71 H432"/>
+  <path class="ln" d="M636 89 H656"/>
+  <path class="ln" d="M760 126 V146"/>
+  <path class="ln" d="M636 187 H656"/>
+  <path class="ln" d="M760 224 V246"/>
+  <path class="ln" d="M636 290 H656"/>
+  <path class="ln2" d="M184 281 C 300 281, 330 287, 432 287"/>
+  <path class="ln2" d="M184 270 C 330 250, 560 240, 656 205"/>
+  <text class="s" x="214" y="232" fill="#f0a35e">Remote Control (outbound, via Anthropic)</text>
+</svg>

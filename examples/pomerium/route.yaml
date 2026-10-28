@@ -1,0 +1,21 @@
+# Just the route, for an existing Pomerium. Add it under `routes:`.
+# The container must share a Docker network with Pomerium (or use host:port).
+# Keep the policy narrow: whoever passes it gets a shell with your Claude login.
+- from: https://claude.example.com
+  to: http://claude:7681
+  allow_websockets: true      # ttyd needs websockets
+  # Sends the signed X-Pomerium-Jwt-Assertion the container checks itself
+  # (CLAUDE_WEB_AUTH=pomerium), so the terminal stays closed even to a request
+  # that reaches the container without passing this policy.
+  pass_identity_headers: true
+  policy:
+    - allow:
+        or:
+          - email:
+              is: you@example.com
+
+# And in the container's environment:
+#   CLAUDE_WEB_AUTH=pomerium
+#   CLAUDE_WEB_POMERIUM_JWKS_URL=https://claude.example.com/.well-known/pomerium/jwks.json
+#   CLAUDE_WEB_POMERIUM_AUDIENCE=claude.example.com
+#   CLAUDE_WEB_ALLOWED_USERS=you@example.com

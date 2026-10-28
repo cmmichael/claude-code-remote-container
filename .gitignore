@@ -1,3 +1,6 @@
 .env
 config/
 workspace/
+examples/*/pomerium.env
+examples/*/pomerium-data/
+examples/*/tailscale-state/
