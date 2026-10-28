@@ -16,7 +16,7 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
-rm -f "$STATE/stopping"   # left by on_stop at the last container stop
+rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
 cd /workspace
 
 if [ ! -w "$HOME" ]; then
@@ -112,8 +112,11 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # repaints.
       claude remote-control > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
           | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
-      if [ $? -eq 143 ]; then
-        sleep 5   # the update watcher moved it onto a new release
+      # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
+      # can't tell the watcher's restart from a failure; the watcher leaves a mark.
+      if [ -e "$STATE/rc-restart" ]; then
+        rm -f "$STATE/rc-restart"
+        sleep 5   # the update watcher moved it onto another release
       else
         echo "[claude-web] remote-control exited -- restarting in 30s (log in via the web terminal if this repeats)"
         sleep 30

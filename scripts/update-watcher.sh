@@ -111,6 +111,7 @@ while sleep 60; do
   rpid=$(pgrep -f -o '^claude remote-control$')
   if [ -n "$rpid" ] && [ "$(running_version "$rpid")" != "$latest" ] && server_idle "$rpid" && release_ok "$latest"; then
     log "$(running_version "$rpid") -> $latest installed; remote-control server's sessions idle; restarting it (pid $rpid); they reattach"
+    touch "$STATE/rc-restart"   # tells entrypoint.sh's loop this stop was ours
     kill -TERM "$rpid"
   fi
   for d in "$STATE"/procs/*/; do
