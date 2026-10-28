@@ -2,6 +2,7 @@
 // Front end for the web terminal. Listens on the public port (7681) and:
 //   GET /api/sessions  -> the Remote Control server's live sessions as JSON
 //   GET /api/whoami    -> who the user check sees ({auth, user}); for checking a proxy setup
+//   GET /healthz       -> "ok" without a user check, for the image's health check
 //   GET /              -> ttyd's page with the sessions badge (web-badge.html) added
 //   anything else      -> proxied to ttyd on 127.0.0.1:$TTYD_INTERNAL_PORT,
 //                         websocket upgrades included
@@ -70,7 +71,7 @@ const num = (f) => { const v = parseInt(read(f) || '', 10); return Number.isFini
 
 function sessions() {
   const now = Math.floor(Date.now() / 1000);
-  const server = pids().find((p) => argv(p).join(' ') === 'claude remote-control');
+  const server = pids().find((p) => { const a = argv(p); return a[0] === 'claude' && a[1] === 'remote-control'; });
   if (!server) return { server: { running: false }, sessions: [] };
   const kids = childrenMap();
   const list = [];
@@ -238,6 +239,11 @@ const deniedBody = (who) => `Not authorized for this terminal: ${who.reason}.\nS
 
 // ---- server ----------------------------------------------------------------
 const server = http.createServer(async (req, res) => {
+  // Health check: no user, no log line, nothing about the terminal.
+  if (req.url === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+    return res.end('ok\n');
+  }
   const who = await identify(req).catch((e) => ({ ok: false, reason: `check failed: ${e.message}` }));
   if (!who.ok) {
     logDenied(req, who);

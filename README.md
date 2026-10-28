@@ -126,6 +126,8 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_UPDATE_IDLE_SECS` | 900 | Idle time before an update restart |
 | `CLAUDE_UPDATE_CHANNEL` | `stable` | Claude Code releases to follow: `stable`, typically about a week behind and skipping releases with major regressions, or `latest`. It sets the first install and Claude Code's own background updater (`autoUpdatesChannel`) |
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
+| `CLAUDE_RC_SERVER_NAME` | the hostname | Title of the session the Remote Control server creates at start, as shown in claude.ai/code and the app |
+| `CLAUDE_RC_PERMISSION_MODE` | Claude Code's default | Permission mode for sessions started from the app: `default`, `acceptEdits`, `plan`, ... |
 | `CLAUDE_WEB_FRONT` | `true` | Serve the terminal through the front end that adds the app-sessions badge; `false` lets ttyd take port 7681 directly |
 | `TTYD_INTERNAL_PORT` | 7683 | Loopback port ttyd uses behind the front end |
 | `CLAUDE_WEB_AUTH` | `none` | Check who uses the web terminal: `none`, `pomerium` or `header` (see Allowed users) |
@@ -148,7 +150,7 @@ Sessions started from claude.ai/code or the Claude app run headless under the Re
 - `scripts/update-watcher.sh` checks every minute whether the running binary is older than the installed one. When no turn is in flight and the terminal has been quiet for the idle time, it sends SIGTERM, and the session loop resumes on the new version. A turn interrupted with Esc never records its end, so after an hour of quiet it stops counting. A permission question left unanswered that long looks the same: the restart drops it, and you ask again in the resumed conversation. Before restarting anything onto a release, it checks that the release answers `claude --version`. A release that fails is not moved onto, and it is checked again every 10 minutes, so a failure that passes, such as a timeout under load, does not strand the session.
 - On `docker stop`, the entrypoint stops its restart loops, sends every Claude process SIGTERM and waits up to `CLAUDE_STOP_GRACE_SECS` before taking tmux down. Claude finishes cleanly and its Remote Control sessions close instead of being killed.
 - Claude Code installs in the background on first start, so the web terminal is up at once. The session waits for the binary, and Ctrl-C there gives a shell.
-- The image's health check reports healthy while the web terminal answers.
+- The image's health check calls `/healthz`, which answers without a user check, so it works with `CLAUDE_WEB_AUTH` on and adds nothing to the log.
 
 ## Compared with other projects
 

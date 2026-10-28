@@ -195,3 +195,30 @@ test('an unknown mode refuses everything', async () => {
     assert.strictEqual((await get(f.port, '/', { 'Tailscale-User-Login': 'me@github' })).status, 403);
   } finally { f.stop(); }
 });
+
+test('/healthz answers without a user check and logs nothing', async () => {
+  const f = await front({ CLAUDE_WEB_AUTH: 'pomerium', CLAUDE_WEB_POMERIUM_JWKS_URL: jwksUrl, CLAUDE_WEB_ALLOWED_USERS: 'me@example.com' });
+  try {
+    const r = await get(f.port, '/healthz');
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body, 'ok\n');
+    assert.strictEqual((await get(f.port, '/')).status, 403);
+    assert.doesNotMatch(f.log(), /refused anonymous GET \/healthz/);
+  } finally { f.stop(); }
+});
+
+test('the sessions list finds a Remote Control server started with flags', async () => {
+  // A process whose command line is exactly `claude remote-control --name x`:
+  // sh runs a script file named remote-control, with argv[0] set to claude.
+  const fs = require('fs'), os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-'));
+  fs.writeFileSync(path.join(dir, 'remote-control'), 'sleep 30\n');
+  const rc = spawn('/bin/sh', ['remote-control', '--name', 'x'], { cwd: dir, argv0: 'claude', stdio: 'ignore' });
+  const f = await front({});
+  try {
+    await new Promise((r) => setTimeout(r, 300));
+    const j = JSON.parse((await get(f.port, '/api/sessions')).body);
+    assert.strictEqual(j.server.running, true);
+    assert.strictEqual(j.server.pid, rc.pid);
+  } finally { f.stop(); rc.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
