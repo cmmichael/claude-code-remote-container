@@ -62,9 +62,17 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_UPDATE_IDLE_SECS` | 900 | Idle time before an update restart |
 | `CLAUDE_UPDATE_CHANNEL` | `stable` | Claude Code releases to follow: `stable`, typically about a week behind and skipping releases with major regressions, or `latest`. It sets the first install and Claude Code's own background updater (`autoUpdatesChannel`) |
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
+| `CLAUDE_WEB_FRONT` | `true` | Serve the terminal through the front end that adds the app-sessions badge; `false` lets ttyd take port 7681 directly |
+| `TTYD_INTERNAL_PORT` | 7683 | Loopback port ttyd uses behind the front end |
 | `CLAUDE_STOP_GRACE_SECS` | 20 | How long Claude gets to exit when the container stops. Keep it under `stop_grace_period` (30s) |
 
 Build arguments `INSTALL_DOCKER_CLI` and `INSTALL_GH` (both `true`) control the optional Docker and GitHub CLIs. To let Claude manage containers, point `DOCKER_HOST` at a restricted socket proxy such as `tecnativa/docker-socket-proxy`. Don't mount the raw Docker socket: that is root on the host.
+
+## App sessions
+
+Sessions started from claude.ai/code or the Claude app run headless under the Remote Control server, so the web terminal can't show them. A badge in the terminal's top-right corner shows how many there are, with a pulsing dot while one is working. Click it for the list: each entry links to the session on claude.ai/code. Esc or a click elsewhere closes it. The badge stays hidden when there are none.
+
+`scripts/web-front.js` provides it. It takes port 7681, proxies the terminal (websockets included) to ttyd on loopback, serves the list as JSON at `/api/sessions`, and adds `scripts/web-badge.html` to the terminal page. Busy and idle come from the session hook's per-process stamps. With `TTYD_CREDENTIAL` set, `/api/sessions` asks for the same credential.
 
 ## How it works
 

@@ -82,7 +82,15 @@ tmux new-session -d -s claude -x 200 -y 50 /usr/local/bin/claude-session 2>/dev/
 # --index serves the newer web client built in the Dockerfile (OSC 52 clipboard).
 # macOptionClickForcesSelection lets Option+drag select text on macOS while tmux
 # and Claude Code hold the mouse; Windows/Linux use Shift+drag.
-ttyd_args=(--writable --port 7681 --interface 0.0.0.0 -t "titleFixed=${CLAUDE_WEB_TITLE:-claude}" -t fontSize=14
+# With the web front end on (the default), ttyd listens on loopback only and
+# web-front.js takes the public port: it proxies the terminal, serves
+# /api/sessions and adds the app-sessions badge to the page.
+if [ "${CLAUDE_WEB_FRONT:-true}" = "true" ]; then
+  ttyd_listen=(--port "${TTYD_INTERNAL_PORT:-7683}" --interface 127.0.0.1)
+else
+  ttyd_listen=(--port 7681 --interface 0.0.0.0)
+fi
+ttyd_args=(--writable "${ttyd_listen[@]}" -t "titleFixed=${CLAUDE_WEB_TITLE:-claude}" -t fontSize=14
   -t macOptionClickForcesSelection=true)
 [ -f /usr/share/ttyd/index.html ] && ttyd_args+=(--index /usr/share/ttyd/index.html)
 if [ -n "${TTYD_CREDENTIAL:-}" ]; then
@@ -96,6 +104,17 @@ fi
   done
 ) &
 loops+=($!)
+
+if [ "${CLAUDE_WEB_FRONT:-true}" = "true" ]; then
+  (
+    while true; do
+      TTYD_INTERNAL_PORT="${TTYD_INTERNAL_PORT:-7683}" node /usr/local/bin/claude-web-front
+      echo "[claude-web] web front end exited -- restarting in 5s"
+      sleep 5
+    done
+  ) &
+  loops+=($!)
+fi
 
 if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
   /usr/local/bin/claude-update-watcher &
@@ -141,6 +160,7 @@ on_stop() {
   touch "$STATE/stopping"   # session.sh must not start Claude again
   kill "${loops[@]}" 2>/dev/null
   pkill -x ttyd 2>/dev/null
+  pkill -f "^node /usr/local/bin/claude-web-front" 2>/dev/null
   local pids i
   pids=$(pgrep -f "$CLAUDE_PROC_RE")
   [ -n "$pids" ] && kill -TERM $pids 2>/dev/null
