@@ -23,6 +23,17 @@ if [ ! -w "$HOME" ]; then
   echo "[claude-web] $HOME is not writable by uid $(id -u); fix ownership of the config volume" >&2
 fi
 
+# Which Claude Code releases to follow: "stable" (the default; typically about a
+# week behind latest, skipping releases with major regressions) or "latest"
+# (every release as it ships). It picks the first install's release and is
+# written to settings.json as autoUpdatesChannel, which Claude Code's own
+# background updater follows.
+CHANNEL="${CLAUDE_UPDATE_CHANNEL:-stable}"
+case "$CHANNEL" in
+  stable|latest) ;;
+  *) echo "[claude-web] CLAUDE_UPDATE_CHANNEL=$CHANNEL is not stable or latest; using stable" >&2; CHANNEL=stable ;;
+esac
+
 # Install Claude Code in the background so the web terminal comes up even when
 # the install cannot run yet (no network on first start, say). The session
 # loop waits for the binary, and the terminal gives a shell meanwhile.
@@ -30,8 +41,8 @@ loops=()   # background loops that on_stop ends
 if ! command -v claude >/dev/null 2>&1; then
   (
     until command -v claude >/dev/null 2>&1; do
-      echo "[claude-web] claude binary not found -- installing to $HOME/.local/bin"
-      curl -fsSL https://claude.ai/install.sh | bash && break
+      echo "[claude-web] claude binary not found -- installing the $CHANNEL release to $HOME/.local/bin"
+      curl -fsSL https://claude.ai/install.sh | bash -s "$CHANNEL" && break
       echo "[claude-web] install failed, retrying in 60s"
       sleep 60
     done
@@ -43,20 +54,22 @@ fi
 # conversation the web session is on (see scripts/session-hook.sh). Rewritten
 # on every start so an update to the hook reaches existing installs: entries
 # pointing at claude-session-hook, and the inline ones earlier versions wrote
-# (they mention autoupdate-state), are replaced; any other hook is kept.
+# (they mention autoupdate-state), are replaced; any other hook is kept. The
+# update channel is set in the same pass.
 settings="$HOME/.claude/settings.json"
 mkdir -p "$HOME/.claude"
 [ -s "$settings" ] || echo '{}' > "$settings"
 tmp=$(mktemp)
-if jq --arg cmd /usr/local/bin/claude-session-hook '
+if jq --arg cmd /usr/local/bin/claude-session-hook --arg ch "$CHANNEL" '
     def ours: (.command // "") | (startswith($cmd + " ") or contains("autoupdate-state"));
     def strip: map(.hooks = ((.hooks // []) | map(select(ours | not)))) | map(select(.hooks | length > 0));
     def entry($ev): [{hooks: [{type: "command", command: ($cmd + " " + $ev), timeout: 10}]}];
     .hooks = ((.hooks // {}) | with_entries(.value |= strip) | with_entries(select(.value | length > 0)))
     | .hooks.UserPromptSubmit += entry("last-prompt")
     | .hooks.Stop += entry("last-stop")
+    | .autoUpdatesChannel = $ch
     ' "$settings" > "$tmp"; then
-  cmp -s "$tmp" "$settings" || { cat "$tmp" > "$settings"; echo "[claude-web] updated the auto-update hooks in $settings"; }
+  cmp -s "$tmp" "$settings" || { cat "$tmp" > "$settings"; echo "[claude-web] updated the auto-update hooks and channel ($CHANNEL) in $settings"; }
 else
   echo "[claude-web] could not parse $settings; auto-update hooks not installed" >&2
 fi

@@ -52,6 +52,32 @@ server_idle() {  # $1 = server pid
   return 0
 }
 
+# A release is moved onto only once it answers --version: one that cannot run
+# here (a broken build, a CPU it does not support) must not turn a working
+# session into a crash loop. The verdict is cached per file (name, size, mtime),
+# so a release still being written is checked again once complete, and a
+# failure is retried after BAD_RETRY_SECS, so a passing one (a timeout under
+# load) does not strand the session until the next release. Logged once each.
+BAD_RETRY_SECS="${CLAUDE_UPDATE_BAD_RETRY_SECS:-600}"
+verified=""   # "<key>:ok" or "<key>:bad:<epoch>"
+warned=""
+release_ok() {  # $1 = the version latest_version reported
+  local bin key out
+  bin=$(readlink -f "$(command -v claude)") || return 1
+  [ "$(basename "$bin")" = "$1" ] && [ -x "$bin" ] || return 1      # moved on meanwhile: next round
+  key=$(stat -c '%n-%s-%Y' "$bin") || return 1
+  case $verified in
+    "$key:ok") return 0 ;;
+    "$key:bad:"*) [ $(( $(date +%s) - ${verified##*:} )) -lt "$BAD_RETRY_SECS" ] && return 1 ;;
+  esac
+  if out=$(timeout 30 "$bin" --version < /dev/null 2>&1); then
+    verified="$key:ok"; log "$1 answers --version; idle sessions can move onto it"; return 0
+  fi
+  verified="$key:bad:$(date +%s)"
+  [ "$warned" = "$key" ] || { warned=$key; log "$1 does not run here ($(printf '%s' "$out" | tail -n 1)); sessions stay where they are, and it is checked again every ${BAD_RETRY_SECS}s"; }
+  return 1
+}
+
 latest_version() { basename "$(readlink -f "$(command -v claude)")"; }
 running_version() { basename "$(readlink -f "/proc/$1/exe" 2>/dev/null)"; }
 
@@ -72,7 +98,8 @@ while sleep 60; do
     # stops counting.
     if { [ "$last_stop" -ge "$last_prompt" ] || [ $((now - tmux_last)) -ge "$STALE_TURN_SECS" ]; } \
        && [ $((now - last_stop)) -ge "$IDLE_SECS" ] \
-       && [ $((now - tmux_last)) -ge "$IDLE_SECS" ]; then
+       && [ $((now - tmux_last)) -ge "$IDLE_SECS" ] \
+       && release_ok "$latest"; then
       log "$(running_version "$pid") -> $latest installed; session idle $((now - tmux_last))s; restarting interactive claude (pid $pid)"
       kill -TERM "$pid"
       sleep 30
@@ -82,7 +109,7 @@ while sleep 60; do
 
   # --- remote-control server: restart when every session under it is idle ---
   rpid=$(pgrep -f -o '^claude remote-control$')
-  if [ -n "$rpid" ] && [ "$(running_version "$rpid")" != "$latest" ] && server_idle "$rpid"; then
+  if [ -n "$rpid" ] && [ "$(running_version "$rpid")" != "$latest" ] && server_idle "$rpid" && release_ok "$latest"; then
     log "$(running_version "$rpid") -> $latest installed; remote-control server's sessions idle; restarting it (pid $rpid); they reattach"
     kill -TERM "$rpid"
   fi
