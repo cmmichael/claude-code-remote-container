@@ -32,7 +32,7 @@ RUN node /ttyd-client/inject-wasm-shim.js /ttyd/html/dist/inline.html /ttyd-clie
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl wget git jq less nano openssh-client procps ripgrep \
+    bash ca-certificates curl wget gawk git jq less nano openssh-client procps ripgrep \
     unzip zip gnupg htop lsof file rsync sqlite3 libnss-wrapper \
     python3 python3-pip python3-venv \
  && rm -rf /var/lib/apt/lists/*

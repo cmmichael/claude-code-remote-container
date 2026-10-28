@@ -31,10 +31,16 @@ log() { echo "[claude-update] $*"; }
 # Every Claude session under the Remote Control server is idle: no turn in
 # flight (an interrupted turn stamps no Stop, so it stops counting after
 # STALE_TURN_SECS) and no prompt, finished turn or start for IDLE_SECS.
+descendants() {  # $1 = pid -> every descendant pid
+  local kid
+  for kid in $(pgrep -P "$1"); do echo "$kid"; descendants "$kid"; done
+}
 server_idle() {  # $1 = server pid
   local kid lp ls started last now
   now=$(date +%s)
-  for kid in $(pgrep -P "$1"); do
+  # Every descendant, not only children: a release that spawned sessions
+  # through an intermediate process must not look like a server with none.
+  for kid in $(descendants "$1"); do
     case $(readlink "/proc/$kid/exe" 2>/dev/null) in "$HOME"/.local/share/claude/versions/*) ;; *) continue ;; esac
     lp=$(cat "$STATE/procs/$kid/last-prompt" 2>/dev/null || echo 0)
     ls=$(cat "$STATE/procs/$kid/last-stop" 2>/dev/null || echo 0)

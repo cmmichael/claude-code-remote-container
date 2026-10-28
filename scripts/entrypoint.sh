@@ -49,7 +49,7 @@ mkdir -p "$HOME/.claude"
 [ -s "$settings" ] || echo '{}' > "$settings"
 tmp=$(mktemp)
 if jq --arg cmd /usr/local/bin/claude-session-hook '
-    def ours: (.command // "") | (startswith($cmd) or contains("autoupdate-state"));
+    def ours: (.command // "") | (startswith($cmd + " ") or contains("autoupdate-state"));
     def strip: map(.hooks = ((.hooks // []) | map(select(ours | not)))) | map(select(.hooks | length > 0));
     def entry($ev): [{hooks: [{type: "command", command: ($cmd + " " + $ev), timeout: 10}]}];
     .hooks = ((.hooks // {}) | with_entries(.value |= strip) | with_entries(select(.value | length > 0)))
@@ -92,7 +92,13 @@ fi
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
   (
     while true; do
-      claude remote-control
+      # The server repaints its whole status block about once a second. Print a
+      # line only when it is new or has been off the screen for over 30 s, so
+      # the container log shows the connect, the environment link and each
+      # session that attaches (again, if it drops and comes back), not the
+      # repaints.
+      claude remote-control > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
+          | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
       if [ $? -eq 143 ]; then
         sleep 5   # the update watcher moved it onto a new release
       else
