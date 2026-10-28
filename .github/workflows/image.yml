@@ -18,8 +18,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # the release job creates tags and releases
+  contents: write        # the release job creates tags and releases
   packages: write
+  pull-requests: read    # the release job looks up the merged PR for its notes
 
 concurrency:
   group: image-${{ github.ref }}
