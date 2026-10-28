@@ -21,7 +21,7 @@ jobs:
       - name: shellcheck
         run: shellcheck --version && shellcheck -S warning scripts/*.sh tests/*.sh
       - name: hadolint
-        run: docker run --rm -i hadolint/hadolint:v2.15.1 hadolint --failure-threshold warning - < Dockerfile
+        run: docker run --rm -i -v "$PWD/.hadolint.yaml:/cfg/hadolint.yaml:ro" hadolint/hadolint:v2.15.1 hadolint --config /cfg/hadolint.yaml --failure-threshold warning - < Dockerfile
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
       - name: node --check

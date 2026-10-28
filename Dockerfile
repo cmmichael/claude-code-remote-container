@@ -9,6 +9,8 @@
 # con-ant/hass-addons (claudecode/Dockerfile). Drop the stage and --index once a
 # ttyd release newer than 1.7.7 ships, but keep the shim or re-check it.
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS ttyd-client
+# A failed download in `curl | tar` / `curl | bash` must fail the build.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 ARG TTYD_CLIENT_COMMIT=2922cb89f518bae4d0fcf4d757a7419638fc71fc
@@ -31,6 +33,7 @@ RUN node /ttyd-client/inject-wasm-shim.js /ttyd/html/dist/inline.html /ttyd-clie
 
 # Base images are pinned by digest; Dependabot opens a PR when they move.
 FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget gawk git jq less nano openssh-client procps ripgrep \
@@ -61,6 +64,8 @@ COPY --from=ttyd-client /ttyd/html/dist/inline.html /usr/share/ttyd/index.html
 # Build with --build-arg INSTALL_DOCKER_CLI=false / INSTALL_GH=false to skip.
 ARG INSTALL_DOCKER_CLI=true
 ARG INSTALL_GH=true
+# $pkgs is a word list on purpose.
+# hadolint ignore=SC2086
 RUN install -m 0755 -d /etc/apt/keyrings \
  && if [ "$INSTALL_DOCKER_CLI" = "true" ]; then \
       curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
@@ -105,6 +110,8 @@ EXPOSE 7681
 # TTYD_CREDENTIAL is healthy too. The terminal starts within seconds now that
 # the Claude install runs in the background. Docker only reports the status;
 # nothing restarts on it unless something like autoheal watches it.
+# Shell form for the `|| exit 1`, which maps any curl failure to Docker's "unhealthy" code.
+# hadolint ignore=DL3025
 HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -so /dev/null http://127.0.0.1:7681/ || exit 1
 

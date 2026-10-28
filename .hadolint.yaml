@@ -1,0 +1,6 @@
+# DL3008 (pin apt package versions): deliberately off. Exact Debian versions
+# disappear from the archive as security updates land, which would break the
+# weekly rebuild whose job is to pick those updates up. Reproducibility comes
+# from the digest-pinned base images instead.
+ignored:
+  - DL3008
