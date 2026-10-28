@@ -1,41 +1,140 @@
 name: image
 
+# Publishes ghcr.io/<owner>/claude-code-web for amd64 and arm64.
+# - main: :latest and :sha-<commit>
+# - tags v*: :<version>
+# - weekly: rebuilds main so Debian security updates reach :latest
+# - manual: any branch, as :sha-<commit> (for trying a branch on a host)
+# Every push to main is also a release (job "release"): the next semver tag,
+# a GitHub Release with the merged PR's title and description as notes, and
+# the image just built tagged :<x.y.z> and :<x.y>. Patch by default; label the
+# PR release:minor, release:major, or release:skip (docs, CI-only changes).
 on:
   push:
     branches: [main]
     tags: ["v*"]
+  schedule:
+    - cron: "17 5 * * 1"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # the release job creates tags and releases
   packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
             type=semver,pattern={{version}}
-      - uses: docker/build-push-action@v6
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # The weekly run pulls fresh base layers and apt packages.
+          no-cache: ${{ github.event_name == 'schedule' }}
+          pull: true
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - name: next version
+        id: v
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null)][0] // empty')
+          labels=""
+          if [ -n "$pr" ]; then labels=$(jq -r '[.labels[]?.name] | join(" ")' <<<"$pr"); fi
+          if [[ " $labels " == *" release:skip "* ]]; then
+            echo "release:skip on the PR; no release"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          prev=$(gh api "repos/$REPO/tags" --paginate --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$prev" ]; then
+            next=0.1.0
+          else
+            IFS=. read -r ma mi pa <<<"${prev#v}"
+            if   [[ " $labels " == *" release:major "* ]]; then next="$((ma + 1)).0.0"
+            elif [[ " $labels " == *" release:minor "* ]]; then next="$ma.$((mi + 1)).0"
+            else next="$ma.$mi.$((pa + 1))"; fi
+          fi
+          {
+            echo "skip=false"
+            echo "prev=$prev"
+            echo "version=$next"
+            echo "minor=${next%.*}"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$pr" ]; then
+            jq -r '"\(.title) (#\(.number))"' <<<"$pr" > title.txt
+            jq -r '.body // ""' <<<"$pr" > notes.md
+          else
+            git_msg=$(gh api "repos/$REPO/commits/$SHA" --jq '.commit.message')
+            head -1 <<<"$git_msg" > title.txt
+            tail -n +3 <<<"$git_msg" > notes.md
+          fi
+          echo "v$next: $(cat title.txt)"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        if: steps.v.outputs.skip == 'false'
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        if: steps.v.outputs.skip == 'false'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: tag the image this run built
+        if: steps.v.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "$IMAGE:${{ steps.v.outputs.version }}" \
+            -t "$IMAGE:${{ steps.v.outputs.minor }}" \
+            "$IMAGE:sha-${SHA::7}"
+          docker buildx imagetools inspect "$IMAGE:${{ steps.v.outputs.version }}" --format '{{json .Manifest.Digest}}' | tr -d '"' > digest.txt
+      - name: GitHub release
+        if: steps.v.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          v="v${{ steps.v.outputs.version }}"
+          prev="${{ steps.v.outputs.prev }}"
+          {
+            cat notes.md
+            echo
+            echo "---"
+            echo
+            echo "**Image:** \`$IMAGE:${{ steps.v.outputs.version }}\` (also \`:${{ steps.v.outputs.minor }}\`, \`:latest\`, \`:sha-${SHA::7}\`)"
+            echo "**Digest:** \`$(cat digest.txt)\`"
+            if [ -n "$prev" ]; then echo "**Changes:** https://github.com/$REPO/compare/$prev...$v"; fi
+          } > release.md
+          gh release create "$v" --repo "$REPO" --target "$SHA" --title "$v: $(cat title.txt)" --notes-file release.md

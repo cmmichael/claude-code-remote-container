@@ -14,7 +14,7 @@ export PATH="$HOME/.local/bin:$PATH"
 export CLAUDE_WEB_INTERACTIVE=1
 STATE="$HOME/.claude/autoupdate-state"
 RC_NAME="${CLAUDE_RC_NAME:-$(hostname)-web}"
-cd /workspace
+cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
 until command -v claude >/dev/null 2>&1; do
   echo "[claude-web] waiting for Claude Code to finish installing (see the container log); Ctrl-C for a shell"
