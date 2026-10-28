@@ -13,6 +13,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The ttyd-client stage builds with Node 22 (yarn lockfile, corepack pin).
+      # Move Node majors deliberately, not through a weekly bump.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     groups:
       base-images:
         patterns: ["*"]

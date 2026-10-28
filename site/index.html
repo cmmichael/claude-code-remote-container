@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>claude-code-web: Claude Code on your home server</title>
+<title>claude-code-remote-container: Claude Code on your home server</title>
 <meta name="description" content="A lightweight container that keeps Claude Code running on your NAS or home server: a persistent web terminal, Remote Control for the Claude app, and updates applied while you're away.">
-<meta property="og:title" content="claude-code-web">
+<meta property="og:title" content="claude-code-remote-container">
 <meta property="og:description" content="Claude Code on your NAS. In a browser tab, and in the Claude app.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -95,23 +95,23 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="#"><img src="assets/logo.svg" alt="">claude-code-web</a>
+    <a class="brand" href="#"><img src="assets/logo.svg" alt="">claude-code-remote-container</a>
     <nav>
       <a class="hide-sm" href="#who">Who it's for</a>
       <a class="hide-sm" href="#uses">Uses</a>
       <a class="hide-sm" href="#compare">Compare</a>
       <a href="#start">Get started</a>
-      <a href="https://github.com/cmmichael/claude-code-web">GitHub</a>
+      <a href="https://github.com/cmmichael/claude-code-remote-container">GitHub</a>
     </nav>
   </header>
 
   <div class="hero">
-    <img class="logo" src="assets/logo.svg" alt="claude-code-web logo">
+    <img class="logo" src="assets/logo.svg" alt="claude-code-remote-container logo">
     <h1>Claude Code on your home server.<br>In a browser tab, and in the Claude app.</h1>
     <p class="lede">A lightweight container for your NAS or always-on box. It keeps Claude Code running next to your files and containers, opens it in any browser, connects it to the Claude app with Remote Control, and installs updates while you're away.</p>
     <div class="cta">
       <a class="btn primary" href="#start">Get started</a>
-      <a class="btn" href="https://github.com/cmmichael/claude-code-web">View on GitHub</a>
+      <a class="btn" href="https://github.com/cmmichael/claude-code-remote-container">View on GitHub</a>
     </div>
   </div>
 
@@ -132,7 +132,7 @@
         <p>The Claude desktop app, or Claude Code in your own terminal, is the better experience on the machine in front of you. You don't need a container for that.</p>
       </div>
       <div class="card yes">
-        <span class="tag">Use claude-code-web</span>
+        <span class="tag">Use claude-code-remote-container</span>
         <h3>On a NAS or home server</h3>
         <p>Synology, Unraid, TrueNAS, a Raspberry Pi, a mini PC under the desk: boxes with no screen that hold your files and run your containers. This puts Claude Code there, always on, reachable from a browser or your phone.</p>
       </div>
@@ -153,7 +153,7 @@
       <div class="card uc"><h3>Home Assistant, Pi-hole</h3><p class="where">a Raspberry Pi's config folders</p><p>Find dead entities in automations, fix slow local DNS, tidy YAML that has grown for years.</p><blockquote>List automations that reference entities that no longer exist.</blockquote></div>
       <div class="card uc"><h3>From your phone</h3><p class="where">the Claude app</p><p>Start a session on the server from the app, or pick up the terminal one. Long jobs keep going in your pocket.</p><blockquote>Commit the route change on its own, with a message saying why.</blockquote></div>
     </div>
-    <p class="note">More prompts and the compose recipes for Synology and Raspberry Pi: <a href="https://github.com/cmmichael/claude-code-web/blob/main/docs/use-cases.md">docs/use-cases.md</a>.</p>
+    <p class="note">More prompts and the compose recipes for Synology and Raspberry Pi: <a href="https://github.com/cmmichael/claude-code-remote-container/blob/main/docs/use-cases.md">docs/use-cases.md</a>.</p>
   </div>
 </section>
 
@@ -193,7 +193,7 @@
     <p class="sub">Other good projects put Claude Code in a container, and they aim at different things. This one does a single job: Claude Code's own interface on a server, wired into the Claude app.</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th></th><th>claude-code-web</th><th>HolyClaude</th><th>claudebox</th><th>beevelop/docker-claude</th></tr></thead>
+        <thead><tr><th></th><th>claude-code-remote-container</th><th>HolyClaude</th><th>claudebox</th><th>beevelop/docker-claude</th></tr></thead>
         <tbody>
           <tr><td>What it is</td><td class="us">Claude Code on a server, in the browser and the Claude app</td><td>All-in-one AI workstation</td><td>Isolated dev sandbox with language profiles</td><td>Headless Remote Control server</td></tr>
           <tr><td>Interface</td><td class="us">Claude Code's own terminal UI in a browser tab</td><td>CloudCLI web app with its own account</td><td>Your local terminal</td><td>Claude app only</td></tr>
@@ -220,18 +220,18 @@
       <li>Start it, open the terminal, run <code>/login</code> with your Claude account, and accept the folder trust prompt.</li>
       <li>Put Pomerium or Tailscale in front, and turn on the container's own user check.</li>
     </ol>
-<pre>git clone https://github.com/cmmichael/claude-code-web && cd claude-code-web
+<pre>git clone https://github.com/cmmichael/claude-code-remote-container && cd claude-code-remote-container
 cp .env.example .env          # set PUID, PGID, WORKSPACE_DIR
 mkdir -p config workspace && sudo chown "$(id -u):$(id -g)" config workspace
 docker compose up -d
 # then open http://127.0.0.1:7681</pre>
-    <p class="note">Full instructions, the Synology walk-through, and Pomerium and Tailscale setups are in the <a href="https://github.com/cmmichael/claude-code-web#readme">README</a>. Remote Control needs a claude.ai subscription; API keys don't work for it.</p>
+    <p class="note">Full instructions, the Synology walk-through, and Pomerium and Tailscale setups are in the <a href="https://github.com/cmmichael/claude-code-remote-container#readme">README</a>. Remote Control needs a claude.ai subscription; API keys don't work for it.</p>
   </div>
 </section>
 
 <div class="wrap">
   <footer>
-    <p>MIT licensed. <a href="https://github.com/cmmichael/claude-code-web">Source on GitHub</a> · <a href="https://github.com/cmmichael/claude-code-web/releases">Releases</a> · <a href="https://github.com/cmmichael/claude-code-web/blob/main/SECURITY.md">Security</a></p>
+    <p>MIT licensed. <a href="https://github.com/cmmichael/claude-code-remote-container">Source on GitHub</a> · <a href="https://github.com/cmmichael/claude-code-remote-container/releases">Releases</a> · <a href="https://github.com/cmmichael/claude-code-remote-container/blob/main/SECURITY.md">Security</a></p>
     <p>An independent community project, not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic. The container installs Claude Code with Anthropic's official installer, under Anthropic's terms.</p>
   </footer>
 </div>

@@ -3,7 +3,7 @@
 # download), check what the container provides, then stop it and check the
 # clean stop.
 #
-#   IMAGE=claude-code-web:ci tests/smoke.sh
+#   IMAGE=claude-code-remote-container:ci tests/smoke.sh
 #
 # Needs docker, curl, jq and node on the host. Exits non-zero on the first
 # failed check and prints the container log.
@@ -11,7 +11,7 @@ set -euo pipefail
 # No `cmd | grep -q` below: grep -q exits at the first match, the writer gets
 # SIGPIPE, and pipefail turns a found line into a failure. Capture, then grep.
 
-IMAGE="${IMAGE:-claude-code-web:ci}"
+IMAGE="${IMAGE:-claude-code-remote-container:ci}"
 NAME="claude-smoke-$$"
 PORT="${SMOKE_PORT:-17681}"
 WORK=$(mktemp -d)

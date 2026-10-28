@@ -1,7 +1,7 @@
 name: image
 
-# Publishes ghcr.io/<owner>/claude-code-web for amd64 and arm64, and also
-# docker.io/<DOCKERHUB_USERNAME>/claude-code-web when the repository variable
+# Publishes ghcr.io/<owner>/claude-code-remote-container for amd64 and arm64, and also
+# docker.io/<DOCKERHUB_USERNAME>/claude-code-remote-container when the repository variable
 # DOCKERHUB_USERNAME and the secret DOCKERHUB_TOKEN (a Docker Hub access token
 # with read/write scope) are set.
 # - main: :latest and :sha-<commit>
@@ -51,7 +51,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository }}
-            name=docker.io/${{ vars.DOCKERHUB_USERNAME }}/claude-code-web,enable=${{ vars.DOCKERHUB_USERNAME != '' }}
+            name=docker.io/${{ vars.DOCKERHUB_USERNAME }}/claude-code-remote-container,enable=${{ vars.DOCKERHUB_USERNAME != '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
@@ -140,7 +140,7 @@ jobs:
             -t "$IMAGE:${{ steps.v.outputs.minor }}" \
             "$IMAGE:sha-${SHA::7}"
           if [ -n "$DOCKERHUB_USERNAME" ]; then
-            hub="docker.io/$DOCKERHUB_USERNAME/claude-code-web"
+            hub="docker.io/$DOCKERHUB_USERNAME/claude-code-remote-container"
             docker buildx imagetools create \
               -t "$hub:${{ steps.v.outputs.version }}" \
               -t "$hub:${{ steps.v.outputs.minor }}" \

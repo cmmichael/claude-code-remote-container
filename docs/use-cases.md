@@ -1,6 +1,6 @@
 # What to use it for
 
-claude-code-web earns its place on a machine with no screen that runs your services: a Synology or other NAS, a Raspberry Pi, a mini PC. Mount the folder your configs live in at `/workspace`, and Claude Code works on them in place, from a browser tab or from the Claude app on your phone.
+claude-code-remote-container earns its place on a machine with no screen that runs your services: a Synology or other NAS, a Raspberry Pi, a mini PC. Mount the folder your configs live in at `/workspace`, and Claude Code works on them in place, from a browser tab or from the Claude app on your phone.
 
 Each example below has a prompt you can paste and the setup it needs. The recipes are at the end.
 
@@ -89,7 +89,7 @@ Synology, where everything lives under `/volume1/docker`:
 ```yaml
 services:
   claude:
-    image: ghcr.io/cmmichael/claude-code-web:latest
+    image: ghcr.io/cmmichael/claude-code-remote-container:latest
     container_name: claude
     init: true
     stop_grace_period: 30s
@@ -98,7 +98,7 @@ services:
       - TZ=Europe/London
       - CLAUDE_RC_NAME=nas-web
     volumes:
-      - /volume1/docker/claude-code-web/config:/config
+      - /volume1/docker/claude-code-remote-container/config:/config
       - /volume1/docker:/workspace        # every service's config, editable
     ports:
       - "127.0.0.1:7681:7681"
@@ -110,7 +110,7 @@ Raspberry Pi (64-bit Raspberry Pi OS on a Pi 3, 4 or 5; the image is built for a
 ```yaml
 services:
   claude:
-    image: ghcr.io/cmmichael/claude-code-web:latest
+    image: ghcr.io/cmmichael/claude-code-remote-container:latest
     container_name: claude
     init: true
     stop_grace_period: 30s

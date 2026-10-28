@@ -12,5 +12,5 @@ Run the checks locally:
 
 ```sh
 node --test tests/*.test.js
-docker build -t claude-code-web:ci . && tests/smoke.sh
+docker build -t claude-code-remote-container:ci . && tests/smoke.sh
 ```

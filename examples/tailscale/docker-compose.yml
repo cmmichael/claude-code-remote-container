@@ -25,7 +25,7 @@ services:
 
   claude:
     build: ../..
-    image: claude-code-web:local
+    image: claude-code-remote-container:local
     network_mode: service:tailscale      # share the sidecar's network: Serve -> 127.0.0.1:7681
     init: true
     stop_grace_period: 30s

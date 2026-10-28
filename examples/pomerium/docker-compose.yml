@@ -1,4 +1,4 @@
-# Pomerium in front of claude-code-web, with the container checking Pomerium's
+# Pomerium in front of claude-code-remote-container, with the container checking Pomerium's
 # signed assertion itself. Single host, Pomerium's built-in Let's Encrypt.
 #
 #   cp pomerium.env.example pomerium.env   # fill in, see the comments there
@@ -20,7 +20,7 @@ services:
 
   claude:
     build: ../..
-    image: claude-code-web:local
+    image: claude-code-remote-container:local
     init: true
     stop_grace_period: 30s
     user: "${PUID:-1000}:${PGID:-1000}"

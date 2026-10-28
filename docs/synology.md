@@ -1,6 +1,6 @@
 # Synology (DSM 7.2+, Container Manager)
 
-This runs claude-code-web as a Container Manager project, using the published image so the NAS doesn't build anything.
+This runs claude-code-remote-container as a Container Manager project, using the published image so the NAS doesn't build anything.
 
 ## 1. Find your user and group IDs
 
@@ -18,8 +18,8 @@ Note the `uid` and `gid`.
 Container Manager doesn't create missing bind-mount folders; the project fails to start instead. In File Station, or over SSH:
 
 ```sh
-sudo mkdir -p /volume1/docker/claude-code-web/config
-sudo chown -R 1026:100 /volume1/docker/claude-code-web      # your uid:gid
+sudo mkdir -p /volume1/docker/claude-code-remote-container/config
+sudo chown -R 1026:100 /volume1/docker/claude-code-remote-container      # your uid:gid
 ```
 
 `config` becomes the container's home: the Claude login, transcripts and settings. Keep it private.
@@ -28,12 +28,12 @@ Pick the folder Claude should work in, for example an existing share such as `/v
 
 ## 3. Create the project
 
-Container Manager → **Project** → **Create**. Path: `/volume1/docker/claude-code-web`. Choose **Create docker-compose.yml** and paste:
+Container Manager → **Project** → **Create**. Path: `/volume1/docker/claude-code-remote-container`. Choose **Create docker-compose.yml** and paste:
 
 ```yaml
 services:
   claude:
-    image: ghcr.io/cmmichael/claude-code-web:latest
+    image: ghcr.io/cmmichael/claude-code-remote-container:latest
     container_name: claude
     hostname: claude
     init: true

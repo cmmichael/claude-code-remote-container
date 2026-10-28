@@ -1,12 +1,12 @@
-<p align="center"><img src="site/assets/logo.svg" width="96" alt="claude-code-web logo"></p>
+<p align="center"><img src="site/assets/logo.svg" width="96" alt="claude-code-remote-container logo"></p>
 
-<h1 align="center">claude-code-web</h1>
+<h1 align="center">claude-code-remote-container</h1>
 
 <p align="center"><b>Claude Code on your home server. In a browser tab, and in the Claude app.</b></p>
 
 <p align="center">
-<a href="https://github.com/cmmichael/claude-code-web/actions/workflows/ci.yml"><img src="https://github.com/cmmichael/claude-code-web/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<a href="https://github.com/cmmichael/claude-code-web/releases"><img src="https://img.shields.io/github/v/release/cmmichael/claude-code-web?sort=semver" alt="Release"></a>
+<a href="https://github.com/cmmichael/claude-code-remote-container/actions/workflows/ci.yml"><img src="https://github.com/cmmichael/claude-code-remote-container/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="https://github.com/cmmichael/claude-code-remote-container/releases"><img src="https://img.shields.io/github/v/release/cmmichael/claude-code-remote-container?sort=semver" alt="Release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT licence"></a>
 </p>
 
@@ -42,7 +42,7 @@ More prompts, and compose recipes for a Synology and a Raspberry Pi, are in [doc
 ## Quick start
 
 ```sh
-git clone https://github.com/cmmichael/claude-code-web && cd claude-code-web
+git clone https://github.com/cmmichael/claude-code-remote-container && cd claude-code-remote-container
 cp .env.example .env            # set PUID/PGID (owner of your files) and WORKSPACE_DIR
 mkdir -p config workspace
 sudo chown "$(id -u):$(id -g)" config workspace   # must match PUID/PGID
@@ -154,7 +154,7 @@ Sessions started from claude.ai/code or the Claude app run headless under the Re
 
 ## Compared with other projects
 
-| | claude-code-web | [HolyClaude](https://github.com/CoderLuii/HolyClaude) | [claudebox](https://github.com/RchGrav/claudebox) | [beevelop/docker-claude](https://github.com/beevelop/docker-claude) |
+| | claude-code-remote-container | [HolyClaude](https://github.com/CoderLuii/HolyClaude) | [claudebox](https://github.com/RchGrav/claudebox) | [beevelop/docker-claude](https://github.com/beevelop/docker-claude) |
 | --- | --- | --- | --- | --- |
 | What it is | Claude Code on a server, in the browser and the Claude app | All-in-one AI workstation | Isolated dev sandbox with language profiles | Headless Remote Control server |
 | Interface | Claude Code's own terminal UI in a browser tab | CloudCLI web app with its own account | Your local terminal | Claude app only |
@@ -175,11 +175,11 @@ Every merge to `main` is a release, published for amd64 and arm64:
 
 | Tag | Moves |
 | --- | --- |
-| `ghcr.io/cmmichael/claude-code-web:latest` | with every release |
+| `ghcr.io/cmmichael/claude-code-remote-container:latest` | with every release |
 | `:0.2` (major.minor) | with patch releases of that minor version |
 | `:0.2.0` | never |
 
-To use it, replace `build: .` in `docker-compose.yml` with `image: ghcr.io/cmmichael/claude-code-web:latest` (or a pinned tag). To apply new releases unattended, run [Watchtower](https://containrrr.dev/watchtower/) with `WATCHTOWER_TIMEOUT=30s`, so it gives the container's clean stop time to finish. Claude Code itself updates inside the container either way; the image only carries the terminal, the scripts and the tools around Claude.
+To use it, replace `build: .` in `docker-compose.yml` with `image: ghcr.io/cmmichael/claude-code-remote-container:latest` (or a pinned tag). To apply new releases unattended, run [Watchtower](https://containrrr.dev/watchtower/) with `WATCHTOWER_TIMEOUT=30s`, so it gives the container's clean stop time to finish. Claude Code itself updates inside the container either way; the image only carries the terminal, the scripts and the tools around Claude.
 
 A weekly rebuild picks up Debian security updates. Each image carries an SBOM and build provenance.
 
@@ -190,10 +190,10 @@ The container runs as whatever `PUID` you choose, which has no entry in `/etc/pa
 ## Development
 
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`. It lints the scripts (shellcheck), the Dockerfile (hadolint) and the workflows (actionlint), runs the web front end's unit tests (`node --test tests/*.test.js`, no Docker needed), then builds the image and runs `tests/smoke.sh` against it.
-- **Smoke test.** `tests/smoke.sh` starts the image with a stand-in `claude`, so it needs no login or download. It checks health, the terminal page and badge, `/api/sessions`, a websocket session through the proxy, the hooks and channel in `settings.json`, SSH for an unknown uid, the update watcher, and a clean `docker stop`. Run it locally with `docker build -t claude-code-web:ci . && tests/smoke.sh`.
+- **Smoke test.** `tests/smoke.sh` starts the image with a stand-in `claude`, so it needs no login or download. It checks health, the terminal page and badge, `/api/sessions`, a websocket session through the proxy, the hooks and channel in `settings.json`, SSH for an unknown uid, the update watcher, and a clean `docker stop`. Run it locally with `docker build -t claude-code-remote-container:ci . && tests/smoke.sh`.
 - **Images** (`.github/workflows/image.yml`) publish to GHCR from `main`, from `v*` tags, weekly (so Debian security updates land), and on demand for any branch. Each image carries an SBOM and provenance attestation.
 - **Pinning.** Base images are pinned by digest and actions by commit. Dependabot opens weekly grouped PRs to move them.
-- **Releases.** Every merge to `main` is a release: the next semver tag, a GitHub Release whose notes are the merged PR's title and description, and the image just built tagged `:<x.y.z>` and `:<x.y>`. It is a patch release by default. Label the PR `release:minor` or `release:major` to bump further, or `release:skip` for changes that ship nothing, such as docs or CI. Pin a host to a release with `ghcr.io/<owner>/claude-code-web:<x.y.z>`, or check out the tag and build it.
+- **Releases.** Every merge to `main` is a release: the next semver tag, a GitHub Release whose notes are the merged PR's title and description, and the image just built tagged `:<x.y.z>` and `:<x.y>`. It is a patch release by default. Label the PR `release:minor` or `release:major` to bump further, or `release:skip` for changes that ship nothing, such as docs or CI. Pin a host to a release with `ghcr.io/<owner>/claude-code-remote-container:<x.y.z>`, or check out the tag and build it.
 
 ## Licence
 

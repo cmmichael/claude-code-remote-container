@@ -1,4 +1,4 @@
-# Minimal Pomerium config for claude-code-web. Secrets come from pomerium.env.
+# Minimal Pomerium config for claude-code-remote-container. Secrets come from pomerium.env.
 # Reference: https://www.pomerium.com/docs/reference
 authenticate_service_url: https://auth.example.com
 autocert: true

@@ -51,8 +51,8 @@ jobs:
         with:
           context: .
           load: true
-          tags: claude-code-web:ci
+          tags: claude-code-remote-container:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: smoke test
-        run: IMAGE=claude-code-web:ci tests/smoke.sh
+        run: IMAGE=claude-code-remote-container:ci tests/smoke.sh
