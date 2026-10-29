@@ -16,7 +16,7 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
-mkdir -p "$STATE/rc-titles"
+rm -rf "$STATE/rc-titles"; mkdir -p "$STATE/rc-titles"   # re-learned as the server reattaches its sessions
 rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
