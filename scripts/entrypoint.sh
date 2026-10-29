@@ -122,16 +122,17 @@ if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
-  # By default the server starts without a session of its own: the one it
-  # would pre-create in /workspace is rarely opened, yet it shows in the app,
-  # counts in the sessions badge and holds the update watcher back.
-  # CLAUDE_RC_PRECREATE_SESSION=true brings it back, titled by --name.
+  # The server keeps the session it pre-creates in /workspace: that session is
+  # what keeps its environment across restarts (recorded in
+  # ~/.claude/projects/<dir>/bridge-pointer.json), so every session started
+  # from the app reattaches after a restart. Tested on 2.1.308: with
+  # --no-create-session-in-dir no pointer is written and each start registers
+  # a new environment, leaving earlier app sessions behind. The pre-created
+  # session is reused on every start, titled by --name; the sessions badge
+  # doesn't count it. --spawn=same-dir answers the spawn-mode question the
+  # server otherwise asks for a git workspace, with no terminal to answer it.
   # --permission-mode applies to sessions started from the app.
-  if [ "${CLAUDE_RC_PRECREATE_SESSION:-false}" = "true" ]; then
-    rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
-  else
-    rc_args=(--no-create-session-in-dir)
-  fi
+  rc_args=(--spawn=same-dir --name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
   [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do

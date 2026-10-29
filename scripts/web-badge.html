@@ -50,17 +50,20 @@
   function render() {
     var d = last;
     var list = (d && d.server && d.server.running && d.sessions) || [];
-    if (!list.length) { badge.style.display = 'none'; panel.style.display = 'none'; badge.classList.remove('cw-open'); return; }
+    var n = list.filter(function (s) { return !s.server_session; }).length;
+    // The server's own session alone doesn't count: show the badge for app
+    // sessions, or while any session (the server's included) is working.
+    if (!n && !(d && d.busy)) { badge.style.display = 'none'; panel.style.display = 'none'; badge.classList.remove('cw-open'); return; }
     badge.style.display = 'inline-flex';
     badge.classList.toggle('cw-busy', !!d.busy);
-    label.textContent = list.length + (list.length === 1 ? ' app session' : ' app sessions');
+    label.textContent = n + (n === 1 ? ' app session' : ' app sessions');
     panel.textContent = '';
     panel.appendChild(el('h4', null, 'App sessions on this server'));
     list.forEach(function (s) {
       var a = el('a', 'cw-row' + (s.busy ? ' cw-busy' : ''));
       a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
       a.appendChild(el('span', 'cw-state', s.busy ? '● working' : 'idle'));
-      a.appendChild(el('b', null, (s.id || 'session').replace(/^cse_/, '').slice(-8)));
+      a.appendChild(el('b', null, s.server_session ? "Server's own session" : (s.id || 'session').replace(/^cse_/, '').slice(-8)));
       var act = s.last_stop || s.last_prompt;
       a.appendChild(el('div', 'cw-meta', 'started ' + ago(s.started, d.now) +
         (act ? ' · active ' + ago(Math.max(s.last_prompt || 0, s.last_stop || 0), d.now) : '') + ' · ' + s.version));

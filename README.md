@@ -34,7 +34,7 @@ More prompts, and compose recipes for a Synology and a Raspberry Pi, are in [doc
 
 - **Persistent web terminal.** tmux behind [ttyd](https://github.com/tsl0922/ttyd). Close the tab or switch devices; the session keeps running and you reattach.
 - **Built for the Claude app.** Remote Control is on. The terminal session appears in the Claude app and on claude.ai, and you can start new sessions from your phone. A badge in the terminal lists those app sessions.
-- **Picks up where you were.** Restarts and rebuilds resume the same conversation by its id.
+- **Picks up where you were.** Restarts, rebuilds and updates resume the terminal's conversation by its id, and every session started from the app reattaches to the Remote Control server.
 - **Updates without the button.** Claude Code downloads updates in the background. The container moves idle sessions onto a new release, after checking that the release runs.
 - **Checks who you are.** Behind Pomerium or Tailscale, the container verifies the signed identity on every request, websockets included.
 - **Server manners.** Runs as any UID/GID, stops cleanly, reports health, and copy and paste reach your clipboard.
@@ -126,8 +126,7 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_UPDATE_IDLE_SECS` | 900 | Idle time before an update restart |
 | `CLAUDE_UPDATE_CHANNEL` | `stable` | Claude Code releases to follow: `stable`, typically about a week behind and skipping releases with major regressions, or `latest`. It sets the first install and Claude Code's own background updater (`autoUpdatesChannel`) |
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
-| `CLAUDE_RC_PRECREATE_SESSION` | `false` | `true` makes the Remote Control server open an idle session in `/workspace` at start. Off by default, so the app and the sessions badge list only sessions someone started |
-| `CLAUDE_RC_SERVER_NAME` | the hostname | Title of that pre-created session, when `CLAUDE_RC_PRECREATE_SESSION=true` |
+| `CLAUDE_RC_SERVER_NAME` | the hostname | Title of the Remote Control server's own session in claude.ai/code and the app. The server keeps this session so its environment, and every app session in it, survives restarts |
 | `CLAUDE_RC_PERMISSION_MODE` | Claude Code's default | Permission mode for sessions started from the app: `default`, `acceptEdits`, `plan`, ... |
 | `CLAUDE_WEB_FRONT` | `true` | Serve the terminal through the front end that adds the app-sessions badge; `false` lets ttyd take port 7681 directly |
 | `TTYD_INTERNAL_PORT` | 7683 | Loopback port ttyd uses behind the front end |
