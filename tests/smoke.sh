@@ -54,6 +54,8 @@ chmod +x "$stub"
 mkdir -p "$WORK/config/.local/share/claude/stub"
 cat > "$WORK/config/.local/share/claude/stub/remote-control" <<'EOF'
 echo "stub remote-control server $*"
+echo "    https://claude.ai/code/session_01SMOKETEST?from=cli Attached"
+echo "    https://claude.ai/code/session_01SMOKETEST?from=cli Tidy the compose file"
 trap 'echo "stub server stopping"; exit 0' TERM
 while :; do sleep 1; done
 EOF
@@ -129,6 +131,13 @@ ok "ssh works for a uid without a passwd entry"
 
 docker exec "$NAME" pgrep -f '^/bin/bash /usr/local/bin/claude-update-watcher' >/dev/null || fail "update watcher not running"
 ok "update watcher running"
+
+grep -q 'stub remote-control server --spawn=same-dir --name ' <<<"$(docker logs "$NAME" 2>&1)" \
+  || fail "Remote Control server not started with --spawn=same-dir and --name"
+ok "Remote Control server starts with --spawn=same-dir and keeps its own session"
+[ "$(cat "$WORK/config/.claude/autoupdate-state/rc-titles/01SMOKETEST" 2>/dev/null)" = "Tidy the compose file" ] \
+  || fail "session title from the server's output was not recorded"
+ok "session titles from the Remote Control server are recorded for the badge"
 
 if grep -q 'could not parse' <<<"$(docker logs "$NAME" 2>&1)"; then fail "entrypoint could not parse settings.json"; fi
 ok "no entrypoint errors"

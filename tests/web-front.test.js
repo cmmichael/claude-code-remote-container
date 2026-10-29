@@ -252,5 +252,6 @@ test('the sessions list finds a Remote Control server started with flags', { ski
     const j = JSON.parse((await get(f.port, '/api/sessions')).body);
     assert.strictEqual(j.server.running, true);
     assert.strictEqual(j.server.pid, rc.pid);
+    assert.strictEqual(j.app_sessions, 0);
   } finally { f.stop(); rc.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
 });

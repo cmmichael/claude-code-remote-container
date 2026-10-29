@@ -16,6 +16,7 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
+rm -rf "$STATE/rc-titles"; mkdir -p "$STATE/rc-titles"   # re-learned as the server reattaches its sessions
 rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
@@ -122,9 +123,17 @@ if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
-  # --name titles the session the server creates at start (claude.ai/code and
-  # the app); --permission-mode applies to sessions started from the app.
-  rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
+  # The server keeps the session it pre-creates in /workspace: that session is
+  # what keeps its environment across restarts (recorded in
+  # ~/.claude/projects/<dir>/bridge-pointer.json), so every session started
+  # from the app reattaches after a restart. Tested on 2.1.308: with
+  # --no-create-session-in-dir no pointer is written and each start registers
+  # a new environment, leaving earlier app sessions behind. The pre-created
+  # session is reused on every start, titled by --name; the sessions badge
+  # doesn't count it. --spawn=same-dir answers the spawn-mode question the
+  # server otherwise asks for a git workspace, with no terminal to answer it.
+  # --permission-mode applies to sessions started from the app.
+  rc_args=(--spawn=same-dir --name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
   [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do
@@ -134,7 +143,7 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # session that attaches (again, if it drops and comes back), not the
       # repaints.
       claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
-          | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
+          | awk -v titles="$STATE/rc-titles" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.
       if [ -e "$STATE/rc-restart" ]; then
