@@ -122,9 +122,16 @@ if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
-  # --name titles the session the server creates at start (claude.ai/code and
-  # the app); --permission-mode applies to sessions started from the app.
-  rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
+  # By default the server starts without a session of its own: the one it
+  # would pre-create in /workspace is rarely opened, yet it shows in the app,
+  # counts in the sessions badge and holds the update watcher back.
+  # CLAUDE_RC_PRECREATE_SESSION=true brings it back, titled by --name.
+  # --permission-mode applies to sessions started from the app.
+  if [ "${CLAUDE_RC_PRECREATE_SESSION:-false}" = "true" ]; then
+    rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
+  else
+    rc_args=(--no-create-session-in-dir)
+  fi
   [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do

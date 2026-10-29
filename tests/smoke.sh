@@ -130,6 +130,10 @@ ok "ssh works for a uid without a passwd entry"
 docker exec "$NAME" pgrep -f '^/bin/bash /usr/local/bin/claude-update-watcher' >/dev/null || fail "update watcher not running"
 ok "update watcher running"
 
+grep -q 'stub remote-control server --no-create-session-in-dir' <<<"$(docker logs "$NAME" 2>&1)" \
+  || fail "Remote Control server not started with --no-create-session-in-dir by default"
+ok "Remote Control server starts without a pre-created session"
+
 if grep -q 'could not parse' <<<"$(docker logs "$NAME" 2>&1)"; then fail "entrypoint could not parse settings.json"; fi
 ok "no entrypoint errors"
 
