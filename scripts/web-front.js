@@ -106,6 +106,9 @@ function sessions() {
       last_stop: ls || null,
       busy,
       server_session: !!own && id.replace(/^cse_/, '') === own,
+      // The title claude.ai and the Claude app show, as the Remote Control
+      // server printed it (recorded by rc-server-filter.awk).
+      title: (read(path.join(STATE, 'rc-titles', id.replace(/^cse_/, ''))) || '').trim() || null,
     });
   }
   list.sort((a, b) => a.started - b.started);

@@ -16,6 +16,7 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
+mkdir -p "$STATE/rc-titles"
 rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
@@ -142,7 +143,7 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # session that attaches (again, if it drops and comes back), not the
       # repaints.
       claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
-          | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
+          | awk -v titles="$STATE/rc-titles" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.
       if [ -e "$STATE/rc-restart" ]; then

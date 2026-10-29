@@ -99,6 +99,7 @@ COPY scripts/with-passwd.sh /usr/local/bin/with-passwd
 COPY scripts/session-hook.sh /usr/local/bin/claude-session-hook
 COPY scripts/web-front.js /usr/local/bin/claude-web-front
 COPY scripts/web-badge.html /usr/local/share/claude-web/web-badge.html
+COPY scripts/rc-server-filter.awk /usr/local/share/claude-web/rc-server-filter.awk
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/claude-session /usr/local/bin/claude-update-watcher /usr/local/bin/with-passwd /usr/local/bin/claude-session-hook /usr/local/bin/claude-web-front \
  && for t in ssh scp sftp ssh-keygen ssh-add; do ln -s with-passwd "/usr/local/bin/$t"; done
 
