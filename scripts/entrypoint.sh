@@ -149,10 +149,13 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       if [ -e "$STATE/rc-folder-busy" ]; then
         rm -f "$STATE/rc-folder-busy"
         echo "[claude-web] another 'claude remote-control' is serving /workspace (one started by hand?). Waiting for it to stop."
+        # Matches any server, the container's own included. That's right here:
+        # this loop only runs while its own server is down (it just exited
+        # with "already served"), so any match is the other one.
         while pgrep -f '^claude remote-control' >/dev/null; do sleep 15; done
         sleep 5
       elif [ -e "$STATE/rc-needs-consent" ]; then
-        echo "[claude-web] Remote Control is waiting for its one-time consent. From the host: 'docker exec -it <container> claude remote-control', answer y, wait for 'Connected', then Ctrl-C. Or in the web terminal: quit Claude (Ctrl-C twice), Ctrl-C again for a shell, same command, then 'exit'. Retrying in 5 minutes."
+        echo "[claude-web] Remote Control is waiting for its one-time consent. From the host: 'docker exec -it <container> claude remote-control', answer y, wait for 'Connected', then Ctrl-C. Or in the web terminal: quit Claude (Ctrl-C twice), press Ctrl-C at 'Restarting in 5s', same command, then 'exit'. Retrying in 5 minutes."
         sleep 300
         rm -f "$STATE/rc-needs-consent"   # kept during the wait so /healthz?full=1 reports it
       elif [ -e "$STATE/rc-restart" ]; then
