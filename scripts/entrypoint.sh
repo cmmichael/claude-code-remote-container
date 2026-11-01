@@ -17,7 +17,7 @@ export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
 rm -rf "$STATE/rc-titles"; mkdir -p "$STATE/rc-titles"   # re-learned as the server reattaches its sessions
-rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
+rm -f "$STATE/stopping" "$STATE/rc-restart" "$STATE/rc-folder-busy"   # left by on_stop / the watcher before the last container stop
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
 if [ ! -w "$HOME" ]; then
@@ -143,11 +143,16 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # session that attaches (again, if it drops and comes back), not the
       # repaints.
       claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
-          | awk -v titles="$STATE/rc-titles" -v consent="$STATE/rc-needs-consent" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
+          | awk -v titles="$STATE/rc-titles" -v consent="$STATE/rc-needs-consent" -v busy="$STATE/rc-folder-busy" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.
-      if [ -e "$STATE/rc-needs-consent" ]; then
-        echo "[claude-web] Remote Control is waiting for its one-time consent. In the web terminal: quit Claude (Ctrl-C twice), Ctrl-C again for a shell, run 'claude remote-control', answer y, then Ctrl-C and 'exit'. Retrying in 5 minutes."
+      if [ -e "$STATE/rc-folder-busy" ]; then
+        rm -f "$STATE/rc-folder-busy"
+        echo "[claude-web] another 'claude remote-control' is serving /workspace (one started by hand?). Waiting for it to stop."
+        while pgrep -f '^claude remote-control' >/dev/null; do sleep 15; done
+        sleep 5
+      elif [ -e "$STATE/rc-needs-consent" ]; then
+        echo "[claude-web] Remote Control is waiting for its one-time consent. From the host: 'docker exec -it <container> claude remote-control', answer y, wait for 'Connected', then Ctrl-C. Or in the web terminal: quit Claude (Ctrl-C twice), Ctrl-C again for a shell, same command, then 'exit'. Retrying in 5 minutes."
         sleep 300
         rm -f "$STATE/rc-needs-consent"   # kept during the wait so /healthz?full=1 reports it
       elif [ -e "$STATE/rc-restart" ]; then

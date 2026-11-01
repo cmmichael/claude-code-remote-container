@@ -53,7 +53,7 @@ Open http://127.0.0.1:7681 on that machine. On first start:
 
 1. Run `/login` with a claude.ai account. Remote Control needs one; API keys don't work for it.
 2. Accept the trust prompt for `/workspace`.
-3. Give Remote Control its one-time consent: quit Claude (Ctrl-C twice), press Ctrl-C again for a shell, run `claude remote-control`, answer `y`, wait for "Connected", then Ctrl-C and `exit`. Until then the container log says it's waiting for this, and `/healthz?full=1` reports `remote_control_needs_consent: true`.
+3. Give Remote Control its one-time consent. From the host, run `docker exec -it <container> claude remote-control`, answer `y`, wait for "Connected", then press **Ctrl-C** to stop it, so the container's own server takes over. Or, in the web terminal, quit Claude (Ctrl-C twice), press Ctrl-C again for a shell, run the same command, and type `exit` when done. Until then the container log says it's waiting for this, and `/healthz?full=1` reports `remote_control_needs_consent: true`.
 
 The Remote Control server retries every 30 seconds and picks up the login by itself. Within a minute the session shows up in the Claude app.
 

@@ -64,7 +64,7 @@ The terminal is only on the NAS's loopback, so the first time, use an SSH tunnel
 ssh -L 7681:127.0.0.1:7681 you@your-nas
 ```
 
-Open http://127.0.0.1:7681, run `/login` with your claude.ai account, and accept the trust prompt for `/workspace`. Then give Remote Control its one-time consent: quit Claude (Ctrl-C twice), press Ctrl-C again for a shell, run `claude remote-control`, answer `y`, wait for "Connected", then Ctrl-C and `exit`. Within a minute the session shows up in the Claude app as `nas-web`. From then on you can use it from the app without the tunnel.
+Open http://127.0.0.1:7681, run `/login` with your claude.ai account, and accept the trust prompt for `/workspace`. Then give Remote Control its one-time consent: over SSH on the NAS, run `sudo docker exec -it claude claude remote-control`, answer `y`, wait for "Connected", then press **Ctrl-C**, so the container's own server takes over. Within a minute the session shows up in the Claude app as `nas-web`. From then on you can use it from the app without the tunnel.
 
 ## 5. Reach the terminal from your devices
 

@@ -17,6 +17,10 @@
 # no terminal to answer it inside the container. When it appears, $consent is
 # touched so the entrypoint can say what to do instead of restarting blindly.
 NF && consent != "" && /Enable Remote Control\?/ { print "" > consent; close(consent) }
+# Another `claude remote-control` already serves this folder (typically one
+# started by hand, e.g. to give the consent): the entrypoint waits for it to
+# stop instead of restarting into the same error every 30 seconds.
+NF && busy != "" && /already served by a terminal/ { print "" > busy; close(busy) }
 NF {
   if (match($0, /session_[A-Za-z0-9]+(\?from=cli)?[ \t]+/)) {
     seg = substr($0, RSTART, RLENGTH); rest = substr($0, RSTART + RLENGTH)
