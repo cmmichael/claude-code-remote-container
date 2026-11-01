@@ -208,7 +208,7 @@ test('/healthz: 503 when the terminal is down, JSON detail with full=1', async (
     const h = JSON.parse(j.body);
     assert.strictEqual(h.ok, false);
     assert.strictEqual(h.terminal, false);
-    assert.deepStrictEqual(Object.keys(h).sort(), ['auth', 'claude_code', 'ok', 'remote_control_server', 'terminal', 'update_watcher']);
+    assert.deepStrictEqual(Object.keys(h).sort(), ['auth', 'claude_code', 'ok', 'remote_control_needs_consent', 'remote_control_server', 'terminal', 'update_watcher']);
   } finally { f.stop(); }
   const up = await front({});
   try {

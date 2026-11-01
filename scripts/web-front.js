@@ -276,6 +276,7 @@ async function health() {
     terminal,
     claude_code: claude,
     remote_control_server: cmd.some((a) => a[0] === 'claude' && a[1] === 'remote-control'),
+    remote_control_needs_consent: fs.existsSync(path.join(STATE, 'rc-needs-consent')),
     update_watcher: cmd.some((a) => a.some((x) => x.endsWith('claude-update-watcher'))),
     auth: AUTH,
   };

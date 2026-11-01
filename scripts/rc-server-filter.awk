@@ -13,6 +13,10 @@
 # changes; the entrypoint clears the folder at start and the server reprints
 # every session as it reattaches. Status words
 # (Attached, Connecting, ...) are not titles.
+# The server's one-time consent question ("Enable Remote Control? (y/n)") has
+# no terminal to answer it inside the container. When it appears, $consent is
+# touched so the entrypoint can say what to do instead of restarting blindly.
+NF && consent != "" && /Enable Remote Control\?/ { print "" > consent; close(consent) }
 NF {
   if (match($0, /session_[A-Za-z0-9]+(\?from=cli)?[ \t]+/)) {
     seg = substr($0, RSTART, RLENGTH); rest = substr($0, RSTART + RLENGTH)

@@ -143,10 +143,14 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # session that attaches (again, if it drops and comes back), not the
       # repaints.
       claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
-          | awk -v titles="$STATE/rc-titles" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
+          | awk -v titles="$STATE/rc-titles" -v consent="$STATE/rc-needs-consent" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.
-      if [ -e "$STATE/rc-restart" ]; then
+      if [ -e "$STATE/rc-needs-consent" ]; then
+        echo "[claude-web] Remote Control is waiting for its one-time consent. In the web terminal: quit Claude (Ctrl-C twice), Ctrl-C again for a shell, run 'claude remote-control', answer y, then Ctrl-C and 'exit'. Retrying in 5 minutes."
+        sleep 300
+        rm -f "$STATE/rc-needs-consent"   # kept during the wait so /healthz?full=1 reports it
+      elif [ -e "$STATE/rc-restart" ]; then
         rm -f "$STATE/rc-restart"
         sleep 5   # the update watcher moved it onto another release
       else
