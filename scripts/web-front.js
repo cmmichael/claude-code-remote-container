@@ -77,12 +77,13 @@ function sessions() {
   const kids = childrenMap();
   // The server's own session (the one it pre-creates and reuses) is recorded
   // in ~/.claude/projects/<its working dir>/bridge-pointer.json. It is listed,
-  // marked server_session, and not counted as an app session.
+  // marked server_session, and not counted as an app session. A pointer left
+  // by an earlier run names another pid and says nothing about this server.
   let own = '';
   try {
     const cwd = fs.readlinkSync(`/proc/${server}/cwd`);
     const ptr = JSON.parse(read(path.join(HOME, '.claude', 'projects', cwd.replace(/[^A-Za-z0-9-]/g, '-'), 'bridge-pointer.json')) || '{}');
-    own = String(ptr.sessionId || '').replace(/^session_/, '');
+    if (ptr.pid === undefined || ptr.pid === server) own = String(ptr.sessionId || '').replace(/^(session|cse)_/, '');
   } catch {}
   const list = [];
   for (const p of descendants(server, kids)) {

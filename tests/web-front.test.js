@@ -255,3 +255,32 @@ test('the sessions list finds a Remote Control server started with flags', { ski
     assert.strictEqual(j.app_sessions, 0);
   } finally { f.stop(); rc.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the sessions list recognises the server\'s own session from its pointer', { skip: otherServerRunning() && 'a real Remote Control server is running here' }, async () => {
+  const fs = require('fs'), os = require('os');
+  const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rc-')));
+  const versions = path.join(home, '.local/share/claude/versions');
+  fs.mkdirSync(versions, { recursive: true });
+  // A "session": a copy of sh under the versions folder, with the flag on its command line.
+  fs.copyFileSync('/bin/sh', path.join(versions, '9.9.9'));
+  fs.chmodSync(path.join(versions, '9.9.9'), 0o755);
+  fs.writeFileSync(path.join(home, 'remote-control'), '"$V" -c "sleep 30; :" sh --session-id cse_OWN123 &\nwait\n');
+  const rc = spawn('/bin/sh', ['remote-control', '--name', 'x'], { cwd: home, argv0: 'claude', stdio: 'ignore', env: { PATH: process.env.PATH, V: path.join(versions, '9.9.9') } });
+  const project = path.join(home, '.claude/projects', home.replace(/[^A-Za-z0-9-]/g, '-'));
+  fs.mkdirSync(project, { recursive: true });
+  const f = await front({ HOME: home });
+  try {
+    await new Promise((r) => setTimeout(r, 300));
+    const own = async (pointer) => {
+      fs.writeFileSync(path.join(project, 'bridge-pointer.json'), JSON.stringify(pointer));
+      const j = JSON.parse((await get(f.port, '/api/sessions')).body);
+      assert.strictEqual(j.sessions.length, 1);
+      return j.sessions[0].server_session;
+    };
+    assert.strictEqual(await own({ sessionId: 'session_OWN123', pid: rc.pid }), true);
+    assert.strictEqual(await own({ sessionId: 'cse_OWN123', pid: rc.pid }), true);
+    assert.strictEqual(await own({ sessionId: 'cse_OWN123' }), true);
+    assert.strictEqual(await own({ sessionId: 'cse_OWN123', pid: rc.pid + 1 }), false);
+    assert.strictEqual(await own({ sessionId: 'cse_OTHER', pid: rc.pid }), false);
+  } finally { f.stop(); rc.kill(); fs.rmSync(home, { recursive: true, force: true }); }
+});

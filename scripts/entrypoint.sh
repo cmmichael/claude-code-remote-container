@@ -141,8 +141,9 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # line only when it is new or has been off the screen for over 30 s, so
       # the container log shows the connect, the environment link and each
       # session that attaches (again, if it drops and comes back), not the
-      # repaints.
-      claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
+      # repaints. sed turns a terminal link into its address and text, with a tab
+      # where the link closes, which is how the filter finds the end of a title.
+      claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\(\x1b\\\|\x07\)/\t/g; s/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
           | awk -v titles="$STATE/rc-titles" -v consent="$STATE/rc-needs-consent" -v busy="$STATE/rc-folder-busy" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.

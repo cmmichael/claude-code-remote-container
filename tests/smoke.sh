@@ -54,8 +54,10 @@ chmod +x "$stub"
 mkdir -p "$WORK/config/.local/share/claude/stub"
 cat > "$WORK/config/.local/share/claude/stub/remote-control" <<'EOF'
 echo "stub remote-control server $*"
-echo "    https://claude.ai/code/session_01SMOKETEST?from=cli Attached"
-echo "    https://claude.ai/code/session_01SMOKETEST?from=cli Tidy the compose file"
+# Session lines are terminal links, with the title as the link text.
+link() { printf '    \033]8;;https://claude.ai/code/session_01SMOKETEST?from=cli\033\\%s\033]8;;\033\\  %s\n' "$1" "$2"; }
+link Attached "connected 2s"
+link "Tidy the compose file" "connected 3s"
 trap 'echo "stub server stopping"; exit 0' TERM
 while :; do sleep 1; done
 EOF

@@ -6,8 +6,12 @@
 # shows the connect, the environment link and each session that attaches, not
 # the repaints.
 #
-# Session lines look like
-#   https://claude.ai/code/session_<ID>?from=cli <title or status>
+# Each session line is a terminal link to the session, with its title or a
+# status as the link text. The entrypoint's sed turns the link into
+#   https://claude.ai/code/session_<ID>?from=cli <title or status><TAB>
+# so the tab marks where the text ends: anything after it on the line (a
+# status, say) is not part of the title. Releases before 2.1.312 printed the
+# text unlinked, up to the end of the line, and that is read the same way.
 # The title is what claude.ai and the Claude app show for the session. The
 # latest one (at most 200 characters) is written to $titles/<ID>, only when it
 # changes; the entrypoint clears the folder at start and the server reprints
@@ -22,10 +26,11 @@ NF && consent != "" && /Enable Remote Control\?/ { print "" > consent; close(con
 # stop instead of restarting into the same error every 30 seconds.
 NF && busy != "" && /already served by a terminal/ { print "" > busy; close(busy) }
 NF {
-  if (match($0, /session_[A-Za-z0-9]+(\?from=cli)?[ \t]+/)) {
-    seg = substr($0, RSTART, RLENGTH); rest = substr($0, RSTART + RLENGTH)
-    match(seg, /^session_[A-Za-z0-9]+/); id = substr(seg, 9, RLENGTH - 8)
-    sub(/^[ \t]+/, "", rest); sub(/[ \t]+$/, "", rest)
+  if (match($0, /session_[A-Za-z0-9]+(\?[^ \t]*)?[ \t]+[^\t]*(\t|$)/)) {
+    rest = substr($0, RSTART, RLENGTH)
+    match(rest, /^session_[A-Za-z0-9]+/); id = substr(rest, 9, RLENGTH - 8)
+    sub(/^session_[A-Za-z0-9]+(\?[^ \t]*)?[ \t]+/, "", rest)
+    gsub(/^[ \t]+|[ \t]+$/, "", rest)
     if (rest != "" && rest !~ /^(Attached|Detached|Connecting|Connected|Reconnecting|Disconnected|Starting|Working|Idle|Running|Waiting|Closed|Ended|Failed|Error)$/ \
         && title[id] != rest && titles != "") {
       title[id] = rest
@@ -34,7 +39,8 @@ NF {
       close(f)
     }
   }
+  line = $0; gsub(/\t/, " ", line)
   t = systime()
-  if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }
-  seen[$0] = t
+  if (!(line in seen) || t - seen[line] > 30) { print "[rc-server] " line; fflush() }
+  seen[line] = t
 }
