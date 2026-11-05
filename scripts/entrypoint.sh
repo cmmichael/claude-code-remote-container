@@ -16,7 +16,8 @@ set -u
 export PATH="$HOME/.local/bin:$PATH"
 STATE="$HOME/.claude/autoupdate-state"
 mkdir -p "$STATE"
-rm -f "$STATE/stopping" "$STATE/rc-restart"   # left by on_stop / the watcher before the last container stop
+rm -rf "$STATE/rc-titles"; mkdir -p "$STATE/rc-titles"   # re-learned as the server reattaches its sessions
+rm -f "$STATE/stopping" "$STATE/rc-restart" "$STATE/rc-folder-busy"   # left by on_stop / the watcher before the last container stop
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
 if [ ! -w "$HOME" ]; then
@@ -122,9 +123,17 @@ if [ "${CLAUDE_AUTO_UPDATE_RESTART:-true}" = "true" ]; then
 fi
 
 if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
-  # --name titles the session the server creates at start (claude.ai/code and
-  # the app); --permission-mode applies to sessions started from the app.
-  rc_args=(--name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
+  # The server keeps the session it pre-creates in /workspace: that session is
+  # what keeps its environment across restarts (recorded in
+  # ~/.claude/projects/<dir>/bridge-pointer.json), so every session started
+  # from the app reattaches after a restart. Tested on 2.1.308: with
+  # --no-create-session-in-dir no pointer is written and each start registers
+  # a new environment, leaving earlier app sessions behind. The pre-created
+  # session is reused on every start, titled by --name; the sessions badge
+  # doesn't count it. --spawn=same-dir answers the spawn-mode question the
+  # server otherwise asks for a git workspace, with no terminal to answer it.
+  # --permission-mode applies to sessions started from the app.
+  rc_args=(--spawn=same-dir --name "${CLAUDE_RC_SERVER_NAME:-$(hostname)}")
   [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do
@@ -132,12 +141,25 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
       # line only when it is new or has been off the screen for over 30 s, so
       # the container log shows the connect, the environment link and each
       # session that attaches (again, if it drops and comes back), not the
-      # repaints.
-      claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
-          | awk 'NF { t = systime(); if (!($0 in seen) || t - seen[$0] > 30) { print "[rc-server] " $0; fflush() }; seen[$0] = t }') 2>&1
+      # repaints. sed turns a terminal link into its address and text, with a tab
+      # where the link closes, which is how the filter finds the end of a title.
+      claude remote-control "${rc_args[@]}" > >(sed -u 's/\x1b\]8;;\(\x1b\\\|\x07\)/\t/g; s/\x1b\]8;;\([^\x1b\x07]*\)\(\x1b\\\|\x07\)/\1 /g; s/\x1b\[[0-9;?]*[A-Za-z]//g' \
+          | awk -v titles="$STATE/rc-titles" -v consent="$STATE/rc-needs-consent" -v busy="$STATE/rc-folder-busy" -f /usr/local/share/claude-web/rc-server-filter.awk) 2>&1
       # The server shuts down cleanly on SIGTERM and exits 0, so the exit code
       # can't tell the watcher's restart from a failure; the watcher leaves a mark.
-      if [ -e "$STATE/rc-restart" ]; then
+      if [ -e "$STATE/rc-folder-busy" ]; then
+        rm -f "$STATE/rc-folder-busy"
+        echo "[claude-web] another 'claude remote-control' is serving /workspace (one started by hand?). Waiting for it to stop."
+        # Matches any server, the container's own included. That's right here:
+        # this loop only runs while its own server is down (it just exited
+        # with "already served"), so any match is the other one.
+        while pgrep -f '^claude remote-control' >/dev/null; do sleep 15; done
+        sleep 5
+      elif [ -e "$STATE/rc-needs-consent" ]; then
+        echo "[claude-web] Remote Control is waiting for its one-time consent. From the host: 'docker exec -it <container> claude remote-control', answer y, wait for 'Connected', then Ctrl-C. Or in the web terminal: quit Claude (Ctrl-C twice), press Ctrl-C at 'Restarting in 5s', same command, then 'exit'. Retrying in 5 minutes."
+        sleep 300
+        rm -f "$STATE/rc-needs-consent"   # kept during the wait so /healthz?full=1 reports it
+      elif [ -e "$STATE/rc-restart" ]; then
         rm -f "$STATE/rc-restart"
         sleep 5   # the update watcher moved it onto another release
       else

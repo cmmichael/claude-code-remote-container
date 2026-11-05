@@ -21,6 +21,7 @@ The container is meant to sit among the usual homelab services: a dashboard, an 
 | `terminal: false` | ttyd stopped; `ok` is false and the status is 503 |
 | `claude_code: null` | The first install is still running, or it failed (see the container log) |
 | `remote_control_server: false` | The Claude login has expired or was never done. Log in again from the web terminal (`/login`) |
+| `remote_control_needs_consent: true` | Remote Control's one-time consent hasn't been given yet. See Quick start, step 3 |
 | `update_watcher: false` | `CLAUDE_AUTO_UPDATE_RESTART=false`, or the watcher crashed |
 
 Use the container name (`claude` here) from monitors on the same Docker network, or `127.0.0.1:7681` from the host when the port is published there.

@@ -34,7 +34,7 @@ More prompts, and compose recipes for a Synology and a Raspberry Pi, are in [doc
 
 - **Persistent web terminal.** tmux behind [ttyd](https://github.com/tsl0922/ttyd). Close the tab or switch devices; the session keeps running and you reattach.
 - **Built for the Claude app.** Remote Control is on. The terminal session appears in the Claude app and on claude.ai, and you can start new sessions from your phone. A badge in the terminal lists those app sessions.
-- **Picks up where you were.** Restarts and rebuilds resume the same conversation by its id.
+- **Picks up where you were.** Restarts, rebuilds and updates resume the terminal's conversation by its id, and every session started from the app reattaches to the Remote Control server.
 - **Updates without the button.** Claude Code downloads updates in the background. The container moves idle sessions onto a new release, after checking that the release runs.
 - **Checks who you are.** Behind Pomerium or Tailscale, the container verifies the signed identity on every request, websockets included.
 - **Server manners.** Runs as any UID/GID, stops cleanly, reports health, and copy and paste reach your clipboard.
@@ -53,6 +53,7 @@ Open http://127.0.0.1:7681 on that machine. On first start:
 
 1. Run `/login` with a claude.ai account. Remote Control needs one; API keys don't work for it.
 2. Accept the trust prompt for `/workspace`.
+3. Give Remote Control its one-time consent. From the host, run `docker exec -it <container> claude remote-control`, answer `y`, wait for "Connected", then press **Ctrl-C** to stop it, so the container's own server takes over. Or in the web terminal: quit Claude (Ctrl-C twice); when it says "Restarting in 5s -- Ctrl-C for a shell", press Ctrl-C; run the same command there, and type `exit` to go back to Claude. Until then the container log says it's waiting for this, and `/healthz?full=1` reports `remote_control_needs_consent: true`.
 
 The Remote Control server retries every 30 seconds and picks up the login by itself. Within a minute the session shows up in the Claude app.
 
@@ -126,7 +127,7 @@ ttyd 1.7.7, the current release, embeds a web client that ignores OSC 52 entirel
 | `CLAUDE_UPDATE_IDLE_SECS` | 900 | Idle time before an update restart |
 | `CLAUDE_UPDATE_CHANNEL` | `stable` | Claude Code releases to follow: `stable`, typically about a week behind and skipping releases with major regressions, or `latest`. It sets the first install and Claude Code's own background updater (`autoUpdatesChannel`) |
 | `CLAUDE_REMOTE_CONTROL_SERVER` | `true` | Run the separate Remote Control server |
-| `CLAUDE_RC_SERVER_NAME` | the hostname | Title of the session the Remote Control server creates at start, as shown in claude.ai/code and the app |
+| `CLAUDE_RC_SERVER_NAME` | the hostname | Title of the Remote Control server's own session in claude.ai/code and the app. The server keeps this session so its environment, and every app session in it, survives restarts |
 | `CLAUDE_RC_PERMISSION_MODE` | Claude Code's default | Permission mode for sessions started from the app: `default`, `acceptEdits`, `plan`, ... |
 | `CLAUDE_WEB_FRONT` | `true` | Serve the terminal through the front end that adds the app-sessions badge; `false` lets ttyd take port 7681 directly |
 | `TTYD_INTERNAL_PORT` | 7683 | Loopback port ttyd uses behind the front end |

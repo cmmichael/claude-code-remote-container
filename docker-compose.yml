@@ -31,7 +31,7 @@ services:
       - CLAUDE_UPDATE_CHANNEL=${CLAUDE_UPDATE_CHANNEL:-stable}
       # Separate Remote Control server for starting new sessions from the app
       - CLAUDE_REMOTE_CONTROL_SERVER=true
-      - CLAUDE_RC_SERVER_NAME=${CLAUDE_RC_SERVER_NAME:-}          # title of its start-up session; default: the hostname
+      - CLAUDE_RC_SERVER_NAME=${CLAUDE_RC_SERVER_NAME:-}          # title of the server's own session; default: the hostname
       - CLAUDE_RC_PERMISSION_MODE=${CLAUDE_RC_PERMISSION_MODE:-}  # for sessions started from the app, e.g. acceptEdits
       # Optional: let Claude drive Docker through a restricted socket proxy, e.g.
       # - DOCKER_HOST=tcp://docker-proxy:2375

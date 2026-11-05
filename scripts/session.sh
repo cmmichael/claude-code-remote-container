@@ -16,11 +16,27 @@ STATE="$HOME/.claude/autoupdate-state"
 RC_NAME="${CLAUDE_RC_NAME:-$(hostname)-web}"
 cd /workspace || echo "[claude-web] /workspace is missing; staying in $PWD" >&2
 
-until command -v claude >/dev/null 2>&1; do
-  echo "[claude-web] waiting for Claude Code to finish installing (see the container log); Ctrl-C for a shell"
-  if ! sleep 10; then
+# Wait $1 seconds; Ctrl-C during the wait opens a login shell instead. The trap
+# matters: without it, bash exits along with an interrupted `sleep`, the tmux
+# pane closes and the web terminal reconnects to a fresh Claude, so the shell
+# never appeared. The sleep runs in the background (async commands ignore
+# SIGINT) and `wait` returns early when the trapped signal arrives.
+pause_or_shell() {
+  local want=0 pid
+  trap 'want=1' INT
+  sleep "$1" & pid=$!
+  wait "$pid"
+  trap - INT
+  if [ "$want" = 1 ]; then
+    kill "$pid" 2>/dev/null
+    echo; echo "[claude-web] shell; type 'exit' to go back to Claude."
     bash -l
   fi
+}
+
+until command -v claude >/dev/null 2>&1; do
+  echo "[claude-web] waiting for Claude Code to finish installing (see the container log); Ctrl-C for a shell"
+  pause_or_shell 10
 done
 
 # Run one claude; succeed unless it failed by itself right away (a resume of a
@@ -49,8 +65,6 @@ while true; do
   [ -e "$STATE/stopping" ] && exit 0
   echo
   echo "[claude-web] claude exited. Restarting in 5s -- Ctrl-C for a shell (type 'exit' to come back)."
-  if ! sleep 5; then
-    bash -l
-  fi
+  pause_or_shell 5
   [ -e "$STATE/stopping" ] && exit 0
 done

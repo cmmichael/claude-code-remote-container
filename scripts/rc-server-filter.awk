@@ -1,0 +1,46 @@
+# Filters `claude remote-control` output for the container log, and records
+# each session's title for the sessions badge.
+#
+# The server repaints its status block about once a second. A line is printed
+# only when it is new or has been off the screen for over 30 s, so the log
+# shows the connect, the environment link and each session that attaches, not
+# the repaints.
+#
+# Each session line is a terminal link to the session, with its title or a
+# status as the link text. The entrypoint's sed turns the link into
+#   https://claude.ai/code/session_<ID>?from=cli <title or status><TAB>
+# so the tab marks where the text ends: anything after it on the line (a
+# status, say) is not part of the title. Releases before 2.1.312 printed the
+# text unlinked, up to the end of the line, and that is read the same way.
+# The title is what claude.ai and the Claude app show for the session. The
+# latest one (at most 200 characters) is written to $titles/<ID>, only when it
+# changes; the entrypoint clears the folder at start and the server reprints
+# every session as it reattaches. Status words
+# (Attached, Connecting, ...) are not titles.
+# The server's one-time consent question ("Enable Remote Control? (y/n)") has
+# no terminal to answer it inside the container. When it appears, $consent is
+# touched so the entrypoint can say what to do instead of restarting blindly.
+NF && consent != "" && /Enable Remote Control\?/ { print "" > consent; close(consent) }
+# Another `claude remote-control` already serves this folder (typically one
+# started by hand, e.g. to give the consent): the entrypoint waits for it to
+# stop instead of restarting into the same error every 30 seconds.
+NF && busy != "" && /already served by a terminal/ { print "" > busy; close(busy) }
+NF {
+  if (match($0, /session_[A-Za-z0-9]+(\?[^ \t]*)?[ \t]+[^\t]*(\t|$)/)) {
+    rest = substr($0, RSTART, RLENGTH)
+    match(rest, /^session_[A-Za-z0-9]+/); id = substr(rest, 9, RLENGTH - 8)
+    sub(/^session_[A-Za-z0-9]+(\?[^ \t]*)?[ \t]+/, "", rest)
+    gsub(/^[ \t]+|[ \t]+$/, "", rest)
+    if (rest != "" && rest !~ /^(Attached|Detached|Connecting|Connected|Reconnecting|Disconnected|Starting|Working|Idle|Running|Waiting|Closed|Ended|Failed|Error)$/ \
+        && title[id] != rest && titles != "") {
+      title[id] = rest
+      f = titles "/" id
+      print substr(rest, 1, 200) > f
+      close(f)
+    }
+  }
+  line = $0; gsub(/\t/, " ", line)
+  t = systime()
+  if (!(line in seen) || t - seen[line] > 30) { print "[rc-server] " line; fflush() }
+  seen[line] = t
+}

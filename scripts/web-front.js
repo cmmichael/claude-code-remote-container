@@ -75,6 +75,16 @@ function sessions() {
   const server = pids().find((p) => { const a = argv(p); return a[0] === 'claude' && a[1] === 'remote-control'; });
   if (!server) return { server: { running: false }, sessions: [] };
   const kids = childrenMap();
+  // The server's own session (the one it pre-creates and reuses) is recorded
+  // in ~/.claude/projects/<its working dir>/bridge-pointer.json. It is listed,
+  // marked server_session, and not counted as an app session. A pointer left
+  // by an earlier run names another pid and says nothing about this server.
+  let own = '';
+  try {
+    const cwd = fs.readlinkSync(`/proc/${server}/cwd`);
+    const ptr = JSON.parse(read(path.join(HOME, '.claude', 'projects', cwd.replace(/[^A-Za-z0-9-]/g, '-'), 'bridge-pointer.json')) || '{}');
+    if (ptr.pid === undefined || ptr.pid === server) own = String(ptr.sessionId || '').replace(/^(session|cse)_/, '');
+  } catch {}
   const list = [];
   for (const p of descendants(server, kids)) {
     const bin = exe(p);
@@ -96,12 +106,17 @@ function sessions() {
       last_prompt: lp || null,
       last_stop: ls || null,
       busy,
+      server_session: !!own && id.replace(/^cse_/, '') === own,
+      // The title claude.ai and the Claude app show, as the Remote Control
+      // server printed it (recorded by rc-server-filter.awk).
+      title: (read(path.join(STATE, 'rc-titles', id.replace(/^cse_/, ''))) || '').trim().slice(0, 200) || null,
     });
   }
   list.sort((a, b) => a.started - b.started);
   return {
     server: { running: true, pid: server, version: path.basename(exe(server)) },
     sessions: list,
+    app_sessions: list.filter((s) => !s.server_session).length,
     busy: list.some((s) => s.busy),
     now,
   };
@@ -262,6 +277,7 @@ async function health() {
     terminal,
     claude_code: claude,
     remote_control_server: cmd.some((a) => a[0] === 'claude' && a[1] === 'remote-control'),
+    remote_control_needs_consent: fs.existsSync(path.join(STATE, 'rc-needs-consent')),
     update_watcher: cmd.some((a) => a.some((x) => x.endsWith('claude-update-watcher'))),
     auth: AUTH,
   };
