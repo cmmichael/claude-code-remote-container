@@ -131,6 +131,9 @@ sshcfg=$(docker exec "$NAME" ssh -G example.org 2>&1) || fail "ssh -G failed: $s
 grep -q '^user ' <<<"$sshcfg" || fail "ssh can't resolve a user for an unknown uid"
 ok "ssh works for a uid without a passwd entry"
 
+docker exec "$NAME" pdftoppm -v >/dev/null 2>&1 || fail "pdftoppm missing"
+ok "pdftoppm is installed, so Claude can read PDFs"
+
 docker exec "$NAME" pgrep -f '^/bin/bash /usr/local/bin/claude-update-watcher' >/dev/null || fail "update watcher not running"
 ok "update watcher running"
 

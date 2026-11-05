@@ -37,7 +37,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget gawk git jq less nano openssh-client procps ripgrep \
-    unzip zip gnupg htop lsof file rsync sqlite3 libnss-wrapper \
+    unzip zip gnupg htop lsof file rsync sqlite3 libnss-wrapper poppler-utils \
     python3 python3-pip python3-venv \
  && rm -rf /var/lib/apt/lists/*
 
