@@ -137,6 +137,7 @@ if [ "${CLAUDE_REMOTE_CONTROL_SERVER:-true}" = "true" ]; then
   [ -n "${CLAUDE_RC_PERMISSION_MODE:-}" ] && rc_args+=(--permission-mode "$CLAUDE_RC_PERMISSION_MODE")
   (
     while true; do
+      claude-pick-release
       # The server repaints its whole status block about once a second. Print a
       # line only when it is new or has been off the screen for over 30 s, so
       # the container log shows the connect, the environment link and each

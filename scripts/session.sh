@@ -54,6 +54,7 @@ try() {
 }
 
 while true; do
+  claude-pick-release
   sid=$(cat "$STATE/session-id" 2>/dev/null || true)
   if [ -n "$sid" ]; then
     try --resume "$sid" || try --continue || try
